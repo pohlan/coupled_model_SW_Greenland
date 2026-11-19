@@ -1,0 +1,75 @@
+#!/bin/bash
+
+target_directory='parameter_runs/'
+
+run_index=811
+for k_s_i in {0.05,} # {0.00005,0.0001,0.0002,0.0005,0.001, 0.002, 0.005, 0.01, 0.02, 0.05}
+do
+  for m_basal_i in {0.001,0.02,0.05,0.1}
+  do
+    echo "k_s = $k_s_i, m_basal=$m_basal_i, run_index=$run_index"
+    # make a new directory
+    new_dir=$target_directory'run_'$run_index/
+    mkdir -p $new_dir
+
+    # parameters
+    e_v=0.0001
+    l_r=5
+    h_r=1.0
+    k_s=$k_s_i
+    k_c=0.1
+    l_c=10
+    beta2=3.7e5
+    p=1.2
+    q=1.0
+    transition=true
+    alpha_s=1.5
+    beta_s=1.5
+    omega=0.0005
+    As_factor=6
+    sig_topo=5
+    melt_input='MAR_monthly'
+    m_basal=$m_basal_i
+    moulins=false
+    t_end=10
+    beta2_inversion=true
+
+    # record parameters in a txt file
+    cat > "$new_dir/parameters.txt" <<EOF
+run_index=$run_index
+e_v=$e_v
+l_r=$l_r
+h_r=$h_r
+k_s=$k_s
+k_c=$k_c
+l_c=$l_c
+beta2=$beta2
+p=$p
+q=$q
+transition=$transition
+alpha_s=$alpha_s
+beta_s=$beta_s
+omega=$omega
+As_factor=$As_factor
+sig_topo=$sig_topo
+melt_input=$melt_input
+m_basal=$m_basal
+moulins=$moulins
+t_end=$t_end
+EOF
+
+    # run the model
+    options="--t_end $t_end --e_v $e_v --l_r $l_r --h_r $h_r --k_s $k_s --k_c $k_c --l_c $l_c --beta2 $beta2 --p $p --q $q --run_index $run_index --alpha_s $alpha_s --beta_s $beta_s --omega $omega --As_factor $As_factor --sig_topo $sig_topo --m_basal $m_basal --melt_input $melt_input"
+    if [ "$transition" = true ]; then
+      options="$options --transition"
+    fi
+    if [ "$moulins" = true ]; then
+      options="$options --moulins"
+    fi
+    options="$options --beta2_inversion"
+    nohup python -u run_coupled_model.py $options > parameter_runs/log_run_$run_index.txt &
+
+    # increase run_index by 1
+    ((run_index=run_index+1))
+  done
+done

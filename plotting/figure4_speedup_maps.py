@@ -1,0 +1,230 @@
+import os
+import sys
+import glob
+from pathlib import Path
+# Add parent directory to path so imports work regardless of where script is run from
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from plotting.loading_functions import *
+from plotting.plotting_functions import *
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from firedrake.pyplot import tripcolor
+import pandas as pd
+import cmcrameri.cm as cmc
+
+run_indices_maps = [312,706]
+model_labels = ["Baseline", "Red. sheet flow"]
+year0 = 2020
+xstart_winter, xend_winter = datetime(year0,10,1), datetime(year0+1,4,30)
+xstart_summer, xend_summer = datetime(year0,5,1), datetime(year0,9,30)
+
+xcoords = [-205482.0,-144630.0]
+ycoords = [-2527653.0,-2.52e6]
+x0 = np.mean(xcoords)
+cols = ["coral","cornflowerblue","yellowgreen","palevioletred"]
+
+# plotting parameters
+vm = 6
+vmin_s, vmax_s = 0, 110
+plt.rcParams['font.size'] = 35
+annotate_fs = 35
+marker_size = 115
+cmap_summer = cmc.nuuk # cmc.davos
+cmap_winter = "BrBG"
+
+# define data paths relative to this script's location
+script_dir = Path(__file__).resolve().parent
+project_path = script_dir.parent
+timeseries_path = str(project_path / "parameter_runs" / f"run_{run_indices_maps[0]}" / "time_series.h5")
+outline_path   = project_path /  "Greenland_data" / "russel" / "russel_domain.gpkg"
+vel_dir = project_path.parent / "GrisVels" / "data" / "MEaSUREs" / "monthly" / "raw"
+fig_path     = project_path / "plotting" / "main_figures"
+
+gdf = gpd.read_file(outline_path)
+
+# load model file meshes
+mesh_, smesh_ = get_meshes(timeseries_path)
+V = df.FunctionSpace(mesh_, "CG", 1)
+
+
+def get_model_winter_speedup_field(mesh_, run_index, B, xstart, xend, xstart_summer, xend_summer, start_year=2014):
+    timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+    us_raw, _, _, _, _, _, _, n_idx, _ = load_model_output(timeseries_path)
+
+    dates_model, i_model_winter = get_model_dates(n_idx, xstart, xend, start_year=start_year)
+    dates_model_pd_winter = pd.to_datetime(dates_model)
+    dates_model, i_model_summer = get_model_dates(n_idx, xstart_summer, xend_summer)
+    dates_model_pd_summer = pd.to_datetime(dates_model)
+
+    dU_winter = np.zeros(us_raw.shape[0])
+    dU_summer = np.zeros(us_raw.shape[0])
+    for n in range(us_raw.shape[0]):
+        U_model = us_raw[n, i_model_winter]
+        df_monthly = pd.DataFrame(U_model, index=dates_model_pd_winter)
+        U_monthly_winter = df_monthly.resample("MS").mean().to_numpy().ravel()
+        dU_winter[n] = fit_linear_slope(U_monthly_winter) #/ np.mean(U_model)
+
+        U_model = us_raw[n, i_model_summer]
+        df_monthly = pd.DataFrame(U_model, index=dates_model_pd_summer)
+        U_monthly_summer = df_monthly.resample("MS").mean().to_numpy().ravel()
+        dU_summer[n] = (np.max(U_monthly_summer) - np.mean(np.concatenate([U_monthly_summer,U_monthly_winter])))
+
+    U_diff_winter = df.Function(V)
+    U_diff_winter.dat.data[:] = dU_winter
+
+    U_diff_summer = df.Function(V)
+    U_diff_summer.dat.data[:] = dU_summer
+
+    return U_diff_winter, U_diff_summer
+
+
+def plot_model_panel(ax, fig, gsc, ii, mesh_, run_index, model_label, B, gdf, vm, annotate_fs, xstart, xend, xcoords, ycoords, cols, season="winter"):
+    U_diff_w, U_diff_s = get_model_winter_speedup_field(mesh_, run_index, B, xstart, xend, xstart_summer, xend_summer, start_year=2014)
+    if season=="winter":
+        cl = tripcolor(U_diff_w, axes=ax, vmin=-vm, vmax=vm, cmap=cmap_winter)
+        ax.annotate(model_label, xy=(-0.08,0.55), xycoords="axes fraction", fontsize=annotate_fs, fontweight="bold", rotation=90, ha="center", va="center", annotation_clip=False)
+    else:
+        cl = tripcolor(U_diff_s, axes=ax, vmin=vmin_s, vmax=vmax_s, cmap=cmap_summer)
+
+    ax.scatter(xcoords, ycoords, marker_size, color="black", marker="x")
+    ax.annotate("A", xy=(xcoords[0]+1e4,ycoords[0]), ha="center", va="center", fontsize=annotate_fs*0.9, fontweight="bold")
+    ax.annotate("B", xy=(xcoords[1]+1e4,ycoords[1]), ha="center", va="center", fontsize=annotate_fs*0.9, fontweight="bold")
+
+    remove_axes(ax)
+    panel_letter_annotation(ax, ii, annotate_fs)
+    gdf.plot(ax=ax, facecolor="none", edgecolor="black", linewidth=1, label="Domain")
+    ax.vlines(x0, ax.get_ylim()[0]+2.4e4, ax.get_ylim()[1]+1e4, color="black", lw=5, ls="dashed")
+    ax.annotate("Fig. 6 \nflux gate", xy=(x0+0.5e4, ax.get_ylim()[0]-6e3), fontsize=annotate_fs, ha="center", annotation_clip=False)
+    draw_contour_lines(ax)
+
+r_bed = get_topo_raster("Greenland_data/BedMachineGreenland-v5_bed_smooth_sig5.nc", outline_path)
+r_thick = get_topo_raster("Greenland_data/BedMachineGreenland-v5_thickness_smooth_sig5.nc", outline_path)
+r_surf  = r_bed+r_thick
+def draw_contour_lines(ax):
+    data    = r_surf.data.squeeze()
+    x, y    = r_surf.coords(grid=False)
+    cs = ax.contour(x, np.flip(y), data,
+                    levels=np.arange(0, 2000, 200),
+                    colors="black",
+                    linewidths=0.4,
+    )
+    labels = ax.clabel(cs, fmt="%d m", fontsize=annotate_fs*0.75, levels=[1400,], rightside_up=False)
+
+
+fig = plt.figure(figsize=(17, 18))
+gs = fig.add_gridspec(5, 2, top=0.99, bottom=0.02, left=0.07, right=0.99, hspace=0.07, wspace=0.02, height_ratios=[0.7,1,1,0.14,1])
+
+# load velocity observations
+files = glob.glob(str(vel_dir/"*vv*.tif"))
+obs_dates_winter, obs_files_winter = get_obs_files(files, xrange=(xstart_winter,xend_winter))
+ex_files, ey_files, vx_files, vy_files = get_obs_error_files(xstart_winter, xend_winter, vel_dir)
+obs_dates_summer, obs_files_summer = get_obs_files(files, xrange=(xstart_summer,xend_summer))
+
+raster0 = get_raster(obs_files_winter[0])
+nx, ny = raster0.data.shape
+Uobs_time_winter = np.zeros((raster0.data.size, len(obs_files_winter)))
+sigma_time = np.zeros((raster0.data.size, len(obs_files_winter)))
+for (n,(fvv,fex,fey,fvx,fvy)) in enumerate(zip(obs_files_winter,ex_files,ey_files,vx_files,vy_files)):
+    raster = get_raster(fvv)
+    Uobs_time_winter[:,n] = raster.data.ravel()
+
+    e_x = get_raster(fex).data.ravel()
+    e_y = get_raster(fey).data.ravel()
+    v_x = get_raster(fvx).data.ravel()
+    v_y = get_raster(fvy).data.ravel()
+    sigma_time[:,n] = obs_sigma(v_x, v_y, e_x, e_y)
+
+Uobs_time_summer = np.zeros((raster0.data.size, len(obs_files_summer)))
+for (n,fvv) in enumerate(obs_files_summer):
+    raster = get_raster(fvv)
+    Uobs_time_summer[:,n] = raster.data.ravel()
+
+
+dU_obs_winter = np.zeros(raster0.data.size)
+dU_obs_summer = np.zeros(raster0.data.size)
+for i in range(Uobs_time_summer.shape[0]):
+    slope, slope_err = fit_linear_slope(Uobs_time_winter[i,:], sigma_time[i,:])
+    dU_obs_winter[i] = slope # / np.mean(Uobs_time_winter[i,:])
+    if (all(np.isfinite(Uobs_time_summer[i,:]))) & (all(Uobs_time_summer[i,:] > 0)):
+        dU_obs_summer[i] = (np.max(Uobs_time_summer[i,:]) - np.mean(np.concatenate([Uobs_time_summer[i,:], Uobs_time_winter[i,:]]))) # / np.mean(Uobs_time[i,:])
+    else:
+        dU_obs_summer[i] = np.nan
+
+
+
+# save as netcdf
+# raster0.data = map
+# xarray_da = raster0.to_xarray()
+# xarray_da.to_netcdf(f"speedup_{year0}_{year0+1}.nc")
+
+# mask out values outside of domain
+domain_outline = gu.Vector(outline_path)
+mask_noglacier   = ~domain_outline.create_mask(raster0)
+dU_obs_winter[mask_noglacier.data.ravel()] = np.nan
+dU_obs_summer[mask_noglacier.data.ravel()] = np.nan
+
+
+# observed winter speedup
+ax = fig.add_subplot(gs[1,0])
+map  = dU_obs_winter.reshape(nx,ny)
+x, y = raster0.coords(grid=False)
+im = ax.pcolormesh(x,np.flip(y), map, vmin=-vm, vmax=vm, cmap=cmap_winter)
+ax.scatter(xcoords, ycoords, marker_size, color="black", marker="x")
+ax.annotate("A", xy=(xcoords[0]+1e4,ycoords[0]), ha="center", va="center", fontsize=annotate_fs*0.9, fontweight="bold")
+ax.annotate("B", xy=(xcoords[1]+1e4,ycoords[1]), ha="center", va="center", fontsize=annotate_fs*0.9, fontweight="bold")
+remove_axes(ax)
+gdf.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=1, label='Domain')
+
+ax.annotate("Observed", xy=(-0.08,0.55), xycoords="axes fraction", fontsize=annotate_fs, fontweight="bold", rotation=90, ha="center", va="center", annotation_clip=False)
+ax.annotate(f"{idx_to_letter(0)}", xy=(0.03,1.0), xycoords="axes fraction", fontsize=annotate_fs*0.95, fontweight="bold")
+name_w = "Winter speedup rate\n"
+lab_w = name_w + r"$\dot{u}_\mathrm{winter}$ " + r"($\mathrm{m\,a^{-1}}$/month)"
+make_custom_cax(fig, gs[0,0], im, lab_w)
+draw_contour_lines(ax)
+
+# scale bar
+scale_length = 30e3
+x0_scale = -2.15e5
+y0_scale = -2.575e6
+line_x = [x0_scale,x0_scale+scale_length]
+line_y = [y0_scale,y0_scale]
+ax.plot(line_x, line_y, color="black", lw=6)
+ax.annotate(f"{int(scale_length*1e-3)} km", [x0_scale+0.5*scale_length,line_y[0]+5e3], c="black", fontsize=annotate_fs, ha="center")
+
+
+# observed summer speedup
+ax = fig.add_subplot(gs[1,1])
+map  = dU_obs_summer.reshape(nx,ny)
+map[map==0] = np.nan
+im = ax.pcolormesh(x,np.flip(y), map, vmin=vmin_s, vmax=vmax_s, cmap=cmap_summer)
+ax.scatter(xcoords, ycoords, marker_size, color="black", marker="x")
+ax.annotate("A", xy=(xcoords[0]+1e4,ycoords[0]), ha="center", va="center", fontsize=annotate_fs*0.9, fontweight="bold")
+ax.annotate("B", xy=(xcoords[1]+1e4,ycoords[1]), ha="center", va="center", fontsize=annotate_fs*0.9, fontweight="bold")
+gdf.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=1, label='Domain')
+
+remove_axes(ax)
+ax.annotate(f"{idx_to_letter(1)}", xy=(0.03,1.0), xycoords="axes fraction", fontsize=annotate_fs*0.95, fontweight="bold")
+name_s = "Max. summer speed\nanomaly "
+lab_s = name_s + r"$\Delta u_\mathrm{max}$ " + r"$\mathrm{(m\,a^{-1})}$"
+make_custom_cax(fig, gs[0,1], im, lab_s)
+draw_contour_lines(ax)
+
+
+#################
+# MODEL         #
+#################
+
+B, H, S = load_topography(project_path, mesh_)
+
+for ii, (run_index, gi, model_label) in enumerate(zip(run_indices_maps, [2,4], model_labels)):
+    print(ii)
+    ax_model = fig.add_subplot(gs[gi,0])
+    plot_model_panel(ax_model, fig, gs[0,0], ii*2+2, mesh_, run_index, model_label, B, gdf, vm, annotate_fs, xstart_winter, xend_winter, xcoords, ycoords, cols, season="winter")
+
+for ii, (run_index, gi, model_label) in enumerate(zip(run_indices_maps, [2,4], model_labels)):
+    print(ii)
+    ax_model = fig.add_subplot(gs[gi,1])
+    plot_model_panel(ax_model, fig, gs[0,1], ii*2+3, mesh_, run_index, model_label, B, gdf, vm, annotate_fs, xstart_winter, xend_winter, xcoords, ycoords, cols, season="summer")
+
+
+plt.savefig(fig_path / "f04.jpg")

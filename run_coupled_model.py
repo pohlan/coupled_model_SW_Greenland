@@ -1,0 +1,281 @@
+import os
+from pathlib import Path
+os.environ['OMP_NUM_THREADS'] = '1'
+import firedrake as df
+from firedrake.checkpointing import CheckpointFile
+from models_main.coupled_model import GLADS, SpecFO, Coupler_Flow_Hydro
+import models_main.helpers as hlp
+from models_main.catchments import get_catchments
+from models_main.initialize import initialize
+import numpy as np
+import pandas as pd
+
+s_per_hour = 3600
+s_per_day  = s_per_hour * 24
+
+args = hlp.get_args()   # command line arguments
+
+data_dir           = Path(args.data_directory)
+bedmachine_dir     = data_dir
+outline_path       = data_dir / "russel" / "russel_domain.gpkg"
+catchment_dir      = data_dir / "Yang_Smith_2016" / "ds01"
+results_dir        = Path(args.results_directory) / f"run_{args.run_index}"
+params_output_file = Path(args.results_directory) / "parameter_runs.csv"
+MAR_monthly_dir = data_dir / "forcing" / "MAR" / "monthly"
+MAR_daily_dir = data_dir / "forcing" / "MAR" / "daily"
+
+# mesh
+mesh_file = str(data_dir / "russel" / "russel.msh")
+# mesh_file = data_dir / "russel/russel_6_glaciers.msh"
+# mesh_file = data_dir / "russel/russel_smaller.msh"
+# mesh_file = data_dir / "russel/russel_Mank5.msh"
+mesh = df.Mesh(mesh_file)
+
+# time stepping
+dt_max = 20/365
+dt_min = 1e-3/365
+timestep_increase_fraction = 1.1
+timestep_reduction_fraction = 0.5
+day = 1/365
+hour = day/24
+def get_dt(m):
+    return max(2.0*hour, 10*hour + hour*(2.0-10)/(10-1e-14) * (m-1e-14))
+
+# mesh node coordinates
+meshx, meshy = zip(*hlp.get_coordinates(mesh, "CG", 1))
+
+# load bed and thickness, interpolated onto mesh
+B, H = hlp.get_topography(mesh, args, results_dir)
+
+# initiate classes
+hydro   = GLADS(mesh, results_dir)
+stokes  = SpecFO(mesh, results_dir)
+coupler = Coupler_Flow_Hydro(mesh, stokes, hydro)
+
+# set the U and N scales for Budd sliding relation
+ones = df.Function(coupler.Q_cg)
+ones.dat.data[:] = 1.
+area = df.assemble(ones*df.dx)
+H_mean = df.assemble(H*df.dx)/area
+Uhat   = df.Constant(50)
+Nhat   = df.Constant(917*9.81*H_mean)
+
+# melt input to hydro model
+f_melt = df.VTKFile(results_dir / "m0_per_year.pvd")
+if args.melt_input == "KAN":
+    zS = B.dat.data[:] + H.dat.data[:] # surface elevation
+    m, calc_m = hlp.melt_fct_KAN(hydro, zS, data_dir)
+elif args.melt_input == "MAR_monthly":
+    m, calc_m = hlp.melt_fct_MAR_monthly_files(MAR_monthly_dir, hydro, H, meshx, meshy)
+elif args.melt_input == "MAR_daily":
+    m, calc_m = hlp.melt_fct_MAR_daily_files(MAR_daily_dir, hydro, H, meshx, meshy)
+
+# moulins
+df_moul, facet_functions, distributed_melt_mask = get_catchments(mesh, bedmachine_dir, catchment_dir, data_dir, outline_path)
+
+# get moulin coordinates that are exactly on the nodes
+x_moulin = np.zeros(len(df_moul.x))
+y_moulin = np.zeros(len(df_moul.y))
+id_mesh = np.zeros(len(df_moul.y), dtype=int)
+i  = 0
+for (mx,my) in zip(df_moul.x,df_moul.y):
+    ii = np.argmin(np.sqrt((np.array(meshx)-mx)**2+(np.array(meshy)-my)**2))
+    x_moulin[i] = meshx[ii]
+    y_moulin[i] = meshy[ii]
+    id_mesh[i] = ii
+    i += 1
+
+# make subdomain for each moulin catchment for RelabeledMesh
+mesh_c = df.RelabeledMesh(mesh, facet_functions, list(range(len(facet_functions))))
+dx_c   = df.dx(domain=mesh_c)
+
+# set geometries and variables
+coupler.set_geometry(B, H)
+stokes.set_coupler(coupler)
+hydro.set_coupler(coupler)
+hydro.build_variables()
+stokes.build_variables()
+dt0= 2*hour
+
+if args.beta2_inversion:
+    # get beta2 from inversion
+    chk_file = str(Path("inversion_results") / "beta2_opt_1e-2.0_run543.h5") # reduced sheet flow
+    # chk_file =  str(Path("inversion_results") / "beta2_opt_1e-2.0_run313.h5") # baseline
+    # chk_file =  str(Path("inversion_results") / "beta2_opt_1e-2.0_run544.h5") # reduced sheet flow, Mank5 domain
+    # chk_file =  str(Path("inversion_results") / "beta2_opt_1e-2.0_run{args.run_index}.h5")
+    with CheckpointFile(chk_file, 'r') as afile:
+            mesh_ = afile.load_mesh()
+            beta2 = afile.load_function(mesh_, name="beta2")
+    df.VTKFile(results_dir / "beta2.pvd").write(beta2)
+    stokes.build_forms(beta2=beta2, q=args.q, p=args.p, Nhat=Nhat, Uhat=Uhat) # beta2 from inversion
+else:
+    stokes.build_forms(beta2=args.beta2, q=args.q, p=args.p, Nhat=Nhat, Uhat=Uhat)  # all constant
+
+# spatially varying h_r
+# x, y = df.SpatialCoordinate(mesh)
+# h_r = df.Function(hydro.V_h).interpolate(1.0 + (7.0 / 50000.0) * (x + 180482.0))
+# h_r.interpolate(df.max_value(df.min_value(h_r, 12.0), 0.6))
+# df.VTKFile(results_dir/"h_r.pvd").write(h_r)
+# hydro.build_forms(m, dt0=dt0, e_v=args.e_v, h_r=h_r, k_c=args.k_c, k_s=args.k_s, l_c=args.l_c, l_r=args.l_r, transition=args.transition, alpha_s=args.alpha_s, beta_s=args.beta_s, omega=args.omega, As_factor=args.As_factor, moulins=args.moulins)
+
+# spatially varying k_s
+# file = "speedup_2019_2020.nc"
+# from plotting.plotting_functions import get_raster
+# r = get_raster(file)
+# V = df.FunctionSpace(mesh_, "CG", 1)
+# meshx, meshy = zip(*hlp.get_coordinates(mesh_, "CG", 1))
+# dU = df.Function(V)
+# dU.dat.data[:] = r.interp_points((meshx, meshy), as_array=True)
+# # k_s = df.Function(V).interpolate(10**(-2.5-dU/2))
+# # k_s.interpolate(df.max_value(df.min_value(k_s, 1e-2), 1e-5))
+# k_s = df.Function(V).interpolate(10**(-2.8-dU/(1)))
+# k_s.interpolate(df.max_value(df.min_value(k_s, 0.1), 1e-5))
+# df.VTKFile(results_dir/"k_s.pvd").write(k_s)
+
+# chk_file = "ks_russel.h5"
+# with CheckpointFile(chk_file, 'r') as afile:
+#     mesh_ = afile.load_mesh()
+#     k_s = afile.load_function(mesh_, "k_s")
+# k_s.dat.data[:] = k_s.dat.data[:]*2
+# df.VTKFile(results_dir/"k_s.pvd").write(k_s)
+
+
+# locally reduced k_s for Isunnguata Sermia
+# from plotting.loading_functions import get_profile
+# from shapely.geometry import Point
+# flowlines_dir = "Greenland_data/profiles/"
+# gl_name = "Isunnguata Sermia"
+# dists, xx, yy = get_profile(flowlines_dir, gl_name)
+# i_keep = np.where(dists < 25e3)
+# dists = dists[i_keep]
+# xx = xx[i_keep]
+# yy = yy[i_keep]
+# profile_width = 4.5e3
+# coords = [(x,y) for (x,y) in zip(xx,yy)]
+# pts_flowl = [Point(c) for c in coords]
+# V_DG0 = df.FunctionSpace(mesh_, "DG", 0)
+# meshx_DG0, meshy_DG0 = zip(*hlp.get_coordinates(mesh_, "DG", 0))
+# s_sub = df.Function(V_DG0)
+# for (i,(mx, my)) in enumerate(zip(meshx_DG0, meshy_DG0)):
+#     dist_to_flowl_pts = Point(mx,my).distance(pts_flowl)
+#     i_flowl = np.argmin(dist_to_flowl_pts)
+#     if dist_to_flowl_pts[i_flowl] < profile_width:
+#         s_sub.dat.data[i] = 1
+# k_s = df.Function(V_DG0).interpolate(0.0004)
+# k_s.dat.data[np.where(s_sub.dat.data_ro==1)] = 0.01
+# df.VTKFile(results_dir/"k_s.pvd").write(k_s)
+
+# hydro.build_forms(m, dt0=dt0, e_v=args.e_v, h_r=args.h_r, k_c=args.k_c, k_s=k_s, l_c=args.l_c, l_r=args.l_r, transition=args.transition, alpha_s=args.alpha_s, beta_s=args.beta_s, omega=args.omega, As_factor=args.As_factor, moulins=args.moulins)
+
+hydro.build_forms(m, dt0=dt0, e_v=args.e_v, h_r=args.h_r, k_c=args.k_c, k_s=args.k_s, l_c=args.l_c, l_r=args.l_r, transition=args.transition, alpha_s=args.alpha_s, beta_s=args.beta_s, omega=args.omega, As_factor=args.As_factor, moulins=args.moulins, friction_heat=args.friction_heat)
+
+# initial melt input to moulins
+DG0 = df.FunctionSpace(mesh_c, "DG", 0)
+m_DG0 = df.Function(DG0).interpolate(hydro.m)
+m_CG1 = df.Function(coupler.Q_cg)
+if hydro.moulins:
+    M_moulins = np.zeros(len(df_moul.x))
+    for i in range(len(M_moulins)):
+        M_moulins[i] = df.assemble(m_DG0*dx_c(i))
+    Qm, delta_moul = hlp.moulin_dirac_from_array(mesh, x_moulin, y_moulin, M_moulins)
+    hydro.Qm.interpolate(Qm)
+    hydro.delta_moul.interpolate(delta_moul)
+    Qm_file = df.VTKFile(results_dir/"moulin_dirac.pvd")
+
+# initialize (run into steady state)
+if args.beta2_inversion:
+    chk_file, csv_file = initialize(mesh, H, B, Uhat, Nhat, args, beta2, results_dir) # beta2 from inversion
+else:
+    chk_file, csv_file = initialize(mesh, H, B, Uhat, Nhat, args, args.beta2, results_dir) # all constant
+with CheckpointFile(chk_file, 'r') as afile:
+    mesh_ = afile.load_mesh()
+    hydro.set_initial_phi(afile.load_function(mesh_, "phi"))
+    hydro.set_initial_h(afile.load_function(mesh_, "h"))
+hydro.set_initial_S(np.float64(pd.read_csv(csv_file).S))
+
+solver_params = {"snes_type":"newtonls",
+                 "pc_factor_mat_solver_type": "mumps",
+                 "snes_rtol": 1e-3,
+                 "snes_atol": 1e-3,
+                 "snes_max_it": 50,
+                 "report": False,
+                 "error_on_nonconvergence": True}
+
+# time stepping and solve
+t       = 0.0
+d       = 0    # count the days
+t_end   = args.t_end
+success = True
+with df.CheckpointFile(str(results_dir/"time_series.h5"), 'w') as afile:
+    afile.save_mesh(mesh)
+    i     = 1    # idx for checkpointing
+
+    while (t <= t_end):
+        dt = float(hydro.dt.values()[0])
+        print(np.max(m_CG1.dat.data_ro))
+        print("Time = {:.2f} years, dt = {:.1f} hours".format(t, dt*365*24))
+        if dt < dt_min:
+            # write failure to table
+            success = False
+            print("Minimal time step reached. Simulation failed.")
+            break
+        try:
+            # interpolate spatially resolved surface runoff
+            m_CG1.dat.data[:] = calc_m(t) #+ args.m_basal
+
+            if hydro.moulins:
+                m_DG0.interpolate(m_CG1)
+                # distribute m_input to moulins
+                for ii in range(len(M_moulins)):
+                    M_moulins[ii] = df.assemble(m_DG0*dx_c(ii))
+                Qm, delta_moul = hlp.moulin_dirac_from_array(mesh, x_moulin, y_moulin, M_moulins)
+                hydro.Qm.interpolate(Qm)
+                hydro.m.interpolate(m_CG1*distributed_melt_mask)
+                hydro.m.dat.data[:] += args.m_basal
+            else:
+                hydro.m.interpolate(m_CG1+args.m_basal)
+
+            # Downs et al variable sheet conductivity
+            # kmin = df.Constant(1e-3*s_per_day*365)
+            # kmax = df.Constant(1e-2*s_per_day*365)
+            # hydro.k_s.interpolate((kmax-kmin)/25 * hydro.m + kmin)
+
+            df.solve(coupler.R == 0, coupler.U, bcs=hydro.bcs, solver_parameters=solver_params)
+            hydro.update_time_variables()
+            t += dt
+            dt_max = get_dt(np.max(m_CG1.dat.data_ro))
+            hydro.dt.assign(min(dt*timestep_increase_fraction,dt_max))
+            if int(t*365) >= d+2:
+                d = int(t*365)
+                f_melt.write(m_CG1, time=t)
+                # hydro.write_variables_pvd(t)
+                stokes.write_variables_pvd(t)
+                afile.save_function(stokes.Us, idx=i, name="Us")
+                # afile.save_function(stokes.Ub, idx=i, name="Ub")
+                afile.save_function(coupler.U.sub(0), idx=i, name="phi")
+                afile.save_function(df.project(hydro.q_s, coupler.Q_cg_vec), idx=i, name="q")
+                Q_subDG0 = hlp.save_DGT0(mesh, hydro.Q_submesh, df.project(abs(hydro.Q),hydro.V_S), hydro.Q_save, hydro.outfile_Q, t)
+                afile.save_function(Q_subDG0, idx=i, name="Q")
+                S_subDG0 = hlp.save_DGT0(mesh, hydro.S_submesh, df.project(hydro.S,hydro.V_S), hydro.S_save, hydro.outfile_S, t)
+                afile.save_function(S_subDG0, idx=i, name="S")
+                afile.save_function(coupler.U.sub(1), idx=i, name="h")
+                afile.save_function(df.project(hydro.N, coupler.Q_cg), idx=i, name="N")
+                if hydro.moulins:
+                    afile.save_function(df.project(hydro.Qm, coupler.Q_cg), idx=i, name="Qm")
+                    afile.save_function(hydro.m, idx=i, name="m")
+                else:
+                    afile.save_function(hydro.m, idx=i, name="m")
+                if hasattr(hydro, 'M_fr'):
+                    afile.save_function(df.project(hydro.M_fr, coupler.Q_cg), idx=i, name="M_fr")
+                i += 1
+
+        except df.exceptions.ConvergenceError:
+            # If solver fails, try again with a smaller time step
+            coupler.U.sub(0).assign(hydro.phi0)
+            coupler.U.sub(1).assign(hydro.h0)
+            coupler.U.sub(2).assign(hydro.S0)
+            hydro.dt.assign(dt*timestep_reduction_fraction)
+            print("Convergence not achieved.  Reducing time step to {:.1f} hours and trying again".format(hydro.dt.values()[0]*365*24))
+
+# write parameters to table:
+hlp.save_params_to_csv(args, params_output_file, success=success)

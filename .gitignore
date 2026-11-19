@@ -221,3 +221,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# ignore data folder
+*data*/
+
+# ignore outputs
+parameter_runs/
+
+# figures
+*.jpg
