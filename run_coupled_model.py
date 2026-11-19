@@ -16,8 +16,9 @@ s_per_day  = s_per_hour * 24
 args = hlp.get_args()   # command line arguments
 
 data_dir           = Path(args.data_directory)
+domain_dir         = data_dir.parent / "domain"
 bedmachine_dir     = data_dir
-outline_path       = data_dir / "russel" / "russel_domain.gpkg"
+outline_path       = domain_dir / "domain_outline.gpkg"
 catchment_dir      = data_dir / "Yang_Smith_2016" / "ds01"
 results_dir        = Path(args.results_directory) / f"run_{args.run_index}"
 params_output_file = Path(args.results_directory) / "parameter_runs.csv"
@@ -25,10 +26,7 @@ MAR_monthly_dir = data_dir / "forcing" / "MAR" / "monthly"
 MAR_daily_dir = data_dir / "forcing" / "MAR" / "daily"
 
 # mesh
-mesh_file = str(data_dir / "russel" / "russel.msh")
-# mesh_file = data_dir / "russel/russel_6_glaciers.msh"
-# mesh_file = data_dir / "russel/russel_smaller.msh"
-# mesh_file = data_dir / "russel/russel_Mank5.msh"
+mesh_file = str(domain_dir / "mesh.msh")
 mesh = df.Mesh(mesh_file)
 
 # time stepping

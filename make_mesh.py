@@ -3,20 +3,22 @@ import numpy as np
 import fiona
 import matplotlib.pyplot as plt
 import geopandas as gpd
+from pathlib import Path
 
 gmsh.initialize()
 gmsh.model.add("domain")
 geometry = gmsh.model.geo
 
-data_dir = "/home/annegret/Projects/coupled_modeling/firedrake_coupler_steps/Greenland_data/russel/"
+# define data paths relative to this script's location
+project_path = Path(__file__).resolve().parent
+domain_dir = project_path / "domain"
+hydro_file = domain_dir / "hydrological_outlets.gpkg"
+gdf = gpd.read_file(domain_dir / "domain_outline.gpkg")
+# gdf = gpd.read_file(domain_dir / "domain_smaller.gpkg")
+# gdf = gpd.read_file(domain_dir / "domain_Mankoff_k09_5glaciers.gpkg")
 
-hydro_file = f"{data_dir}hydrological_outlets_russel.gpkg"
-# hydro_file = f"{data_dir}hydrological_outlets_6_glaciers.gpkg"
+output_file = str(domain_dir / "mesh.msh")
 
-gdf = gpd.read_file("Greenland_data/russel/russel_domain.gpkg")
-# gdf = gpd.read_file("Greenland_data/russel/russel_domain_6_glaciers.gpkg")
-# gdf = gpd.read_file("Greenland_data/russel/domain_smaller.gpkg")
-# gdf = gpd.read_file("Greenland_data/russel/domain_Mankoff_k09_5glaciers.gpkg")
 geom = gdf.geometry[0] #.geoms[0]
 coords_outer = geom.exterior.coords[:-1]  # last point is double, remove it
 # if there is an actual hole in the polygon
@@ -79,20 +81,16 @@ gmsh.model.mesh.field.setString(f, "F", "300 + 20000 / (1+exp(-8e-5*(x+180e3)))"
 gmsh.model.mesh.field.setAsBackgroundMesh(f)
 
 gmsh.model.mesh.generate(2)
-gmsh.write(f"{data_dir}russel.msh")
-# gmsh.write(f"{data_dir}russel_6_glaciers.msh")
-# gmsh.write(f"{data_dir}russel_Mank5.msh")
+gmsh.write(output_file)
 gmsh.finalize()
 
 # plot
 import firedrake as df
 from firedrake.pyplot import tripcolor, triplot
 import matplotlib.pyplot as plt
-mesh = df.Mesh(f"{data_dir}russel.msh")
-# mesh = df.Mesh(f"{data_dir}russel_6_glaciers.msh")
+mesh = df.Mesh(output_file)
 fig, axes = plt.subplots()
 triplot(mesh, axes=axes)
 axes.legend()
 axes.axis("equal")
-plt.savefig(f"{data_dir}russel_mesh.jpg", dpi=300)
-# plt.savefig(f"{data_dir}russel_6_glaciers.jpg", dpi=300)
+plt.savefig(domain_dir / "mesh.jpg", dpi=300)

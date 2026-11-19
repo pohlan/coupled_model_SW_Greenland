@@ -231,3 +231,6 @@ parameter_runs/
 
 # figures
 *.jpg
+
+# mesh
+*.msh
