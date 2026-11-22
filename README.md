@@ -10,7 +10,7 @@ For other python libraries see `requirements.txt`.
 
 ## Data requirements
 
-Input data to download manually
+The workflow applied here (using `start_run.sh` and `run_coupled_model.py`) requires manual download of:
 - Bed and surface topography as a netcdf file
 - Melt input: hard-coded to use MAR monthly or daily runoff; daily data can be downloaded from [here](https://doi.org/10.5281/zenodo.19691263), monthly data used to be available [here](http://ftp.climato.be/fettweis/) (currently not?)
 - For moulin runs: Surface catchments, available for download in the supporting information of [Yang and Smith (2016)](https://doi.org/10.1002/2016JF003927)
@@ -18,11 +18,11 @@ Input data to download manually
 The domain outline and hydrological outlets are provided in the `domain/` directory.
 
 The data directory is specified as `Greenland_data/` per default:
+https://github.com/pohlan/coupled_model_SW_Greenland/blob/35942fe82d0f1aa2fff961a083d6dac6b6e294cb/models_main/helpers.py#L36
 
+and the structure is specified in `run_coupled_model.py`:
 
-and the following structure:
-
-
+https://github.com/pohlan/coupled_model_SW_Greenland/blob/35942fe82d0f1aa2fff961a083d6dac6b6e294cb/run_coupled_model.py#L20-L24
 
 ## Running the model
 
