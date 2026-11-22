@@ -10,12 +10,19 @@ For other python libraries see `requirements.txt`.
 
 ## Data requirements
 
+Input data to download manually
 - Bed and surface topography as a netcdf file
 - Melt input: hard-coded to use MAR monthly or daily runoff; daily data can be downloaded from [here](https://doi.org/10.5281/zenodo.19691263), monthly data used to be available [here](http://ftp.climato.be/fettweis/) (currently not?)
 - For moulin runs: Surface catchments, available for download in the supporting information of [Yang and Smith (2016)](https://doi.org/10.1002/2016JF003927)
 
+The domain outline and hydrological outlets are provided in the `domain/` directory.
 
-[Note: this is not fully streamlined yet]
+The data directory is specified as `Greenland_data/` per default:
+
+
+and the following structure:
+
+
 
 ## Running the model
 

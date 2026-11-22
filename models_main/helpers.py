@@ -1,6 +1,5 @@
 from pathlib import Path
 import firedrake as df
-from firedrake.checkpointing import CheckpointFile
 from firedrake.pyplot import tripcolor, triplot
 import xarray as xr
 import scipy.interpolate as itp
@@ -35,6 +34,7 @@ def get_args():
     parser.add_argument('--p', type=float, default=1, help='pressure exponent')
     parser.add_argument('--q', type=float, default=1, help='sliding exponent')
     parser.add_argument('--data_directory', default='Greenland_data/')
+    parser.add_argument('--domain_outline_dir', default='domain/', help='directory with domain outline and hydrological outlets gpkg/shape files')
     parser.add_argument('--results_directory', default='parameter_runs/')
     parser.add_argument('--sig_topo', type=int, default=5, help='smoothing parameter for bed elevation and thickness; 0: no smoothing')
     parser.add_argument('--melt_input', type=str, default='MAR', help='one of `MAR` (monthly), `KAN` (daily) or `avg` (RACMO but an average, same every year)')
@@ -85,7 +85,7 @@ def get_params_from_input_file(project_path, run_index):
                 pass
         return float_params
 
-def get_topography(mesh, args, results_dir):
+def get_topography(mesh, args, topo_dir, results_dir):
     # function spaces
     V = df.FunctionSpace(mesh, "CG", 1)
     v_dg = df.VectorFunctionSpace(mesh, "CG", 1)
@@ -97,13 +97,12 @@ def get_topography(mesh, args, results_dir):
 
     # load bed and thickness data, either original BedMachine or smoothed
     sig = args.sig_topo
-    data_dir    = Path(args.data_directory)
     if sig==0:
-        r_bed = gu.Raster(f"NETCDF:" + str(data_dir / "BedMachineGreenland-v5.nc") + ":bed")
-        r_thk = gu.Raster(f"NETCDF:" + str(data_dir / "BedMachineGreenland-v5.nc") + ":thickness")
+        r_bed = gu.Raster(f"NETCDF:" + str(topo_dir / "BedMachineGreenland-v5.nc") + ":bed")
+        r_thk = gu.Raster(f"NETCDF:" + str(topo_dir / "BedMachineGreenland-v5.nc") + ":thickness")
     else:  # higher sigma == more smoothing
-        r_bed = gu.Raster(str(data_dir / f"BedMachineGreenland-v5_bed_smooth_sig{sig}.nc"))
-        r_thk = gu.Raster(str(data_dir / f"BedMachineGreenland-v5_thickness_smooth_sig{sig}.nc"))
+        r_bed = gu.Raster(str(topo_dir / f"BedMachineGreenland-v5_bed_smooth_sig{sig}.nc"))
+        r_thk = gu.Raster(str(topo_dir / f"BedMachineGreenland-v5_thickness_smooth_sig{sig}.nc"))
 
     # interpolate onto mesh
     B.dat.data[:] = r_bed.interp_points((meshx, meshy), as_array=True)

@@ -1,9 +1,6 @@
-import os
-os.environ['OMP_NUM_THREADS'] = '1'
 import firedrake as df
 from firedrake.checkpointing import CheckpointFile
-from models_main.coupled_model import GLADS, SpecFO, Coupler_Flow_Hydro, Coupler_Hydro
-import models_main.helpers as hlp
+from .coupled_model import GLADS, SpecFO, Coupler_Flow_Hydro, Coupler_Hydro
 import numpy as np
 import pandas as pd
 

@@ -3,27 +3,29 @@ from pathlib import Path
 os.environ['OMP_NUM_THREADS'] = '1'
 import firedrake as df
 from firedrake.checkpointing import CheckpointFile
-from models_main.coupled_model import GLADS, SpecFO, Coupler_Flow_Hydro
-import models_main.helpers as hlp
-from models_main.catchments import get_catchments
-from models_main.initialize import initialize
+import models_main as model
 import numpy as np
 import pandas as pd
 
 s_per_hour = 3600
 s_per_day  = s_per_hour * 24
 
-args = hlp.get_args()   # command line arguments
+args = model.get_args()   # command line arguments
 
+# main data and domain directories
 data_dir           = Path(args.data_directory)
-domain_dir         = data_dir.parent / "domain"
-bedmachine_dir     = data_dir
+domain_dir         = Path(args.domain_outline_dir)
 outline_path       = domain_dir / "domain_outline.gpkg"
+
+# specify sub-directories of data folder
+bedmachine_dir     = data_dir / "bedmachine"
 catchment_dir      = data_dir / "Yang_Smith_2016" / "ds01"
+MAR_monthly_dir    = data_dir / "forcing" / "MAR" / "monthly"
+MAR_daily_dir      = data_dir / "forcing" / "MAR" / "daily"
+
+# output paths
 results_dir        = Path(args.results_directory) / f"run_{args.run_index}"
 params_output_file = Path(args.results_directory) / "parameter_runs.csv"
-MAR_monthly_dir = data_dir / "forcing" / "MAR" / "monthly"
-MAR_daily_dir = data_dir / "forcing" / "MAR" / "daily"
 
 # mesh
 mesh_file = str(domain_dir / "mesh.msh")
@@ -40,15 +42,15 @@ def get_dt(m):
     return max(2.0*hour, 10*hour + hour*(2.0-10)/(10-1e-14) * (m-1e-14))
 
 # mesh node coordinates
-meshx, meshy = zip(*hlp.get_coordinates(mesh, "CG", 1))
+meshx, meshy = zip(*model.get_coordinates(mesh, "CG", 1))
 
 # load bed and thickness, interpolated onto mesh
-B, H = hlp.get_topography(mesh, args, results_dir)
+B, H = model.get_topography(mesh, args, bedmachine_dir, results_dir)
 
 # initiate classes
-hydro   = GLADS(mesh, results_dir)
-stokes  = SpecFO(mesh, results_dir)
-coupler = Coupler_Flow_Hydro(mesh, stokes, hydro)
+hydro   = model.GLADS(mesh, results_dir)
+stokes  = model.SpecFO(mesh, results_dir)
+coupler = model.Coupler_Flow_Hydro(mesh, stokes, hydro)
 
 # set the U and N scales for Budd sliding relation
 ones = df.Function(coupler.Q_cg)
@@ -62,14 +64,14 @@ Nhat   = df.Constant(917*9.81*H_mean)
 f_melt = df.VTKFile(results_dir / "m0_per_year.pvd")
 if args.melt_input == "KAN":
     zS = B.dat.data[:] + H.dat.data[:] # surface elevation
-    m, calc_m = hlp.melt_fct_KAN(hydro, zS, data_dir)
+    m, calc_m = model.melt_fct_KAN(hydro, zS, data_dir)
 elif args.melt_input == "MAR_monthly":
-    m, calc_m = hlp.melt_fct_MAR_monthly_files(MAR_monthly_dir, hydro, H, meshx, meshy)
+    m, calc_m = model.melt_fct_MAR_monthly_files(MAR_monthly_dir, hydro, H, meshx, meshy)
 elif args.melt_input == "MAR_daily":
-    m, calc_m = hlp.melt_fct_MAR_daily_files(MAR_daily_dir, hydro, H, meshx, meshy)
+    m, calc_m = model.melt_fct_MAR_daily_files(MAR_daily_dir, hydro, H, meshx, meshy)
 
 # moulins
-df_moul, facet_functions, distributed_melt_mask = get_catchments(mesh, bedmachine_dir, catchment_dir, data_dir, outline_path)
+df_moul, facet_functions, distributed_melt_mask = model.get_catchments(mesh, bedmachine_dir, catchment_dir, data_dir, outline_path)
 
 # get moulin coordinates that are exactly on the nodes
 x_moulin = np.zeros(len(df_moul.x))
@@ -175,16 +177,16 @@ if hydro.moulins:
     M_moulins = np.zeros(len(df_moul.x))
     for i in range(len(M_moulins)):
         M_moulins[i] = df.assemble(m_DG0*dx_c(i))
-    Qm, delta_moul = hlp.moulin_dirac_from_array(mesh, x_moulin, y_moulin, M_moulins)
+    Qm, delta_moul = model.moulin_dirac_from_array(mesh, x_moulin, y_moulin, M_moulins)
     hydro.Qm.interpolate(Qm)
     hydro.delta_moul.interpolate(delta_moul)
     Qm_file = df.VTKFile(results_dir/"moulin_dirac.pvd")
 
 # initialize (run into steady state)
 if args.beta2_inversion:
-    chk_file, csv_file = initialize(mesh, H, B, Uhat, Nhat, args, beta2, results_dir) # beta2 from inversion
+    chk_file, csv_file = model.initialize(mesh, H, B, Uhat, Nhat, args, beta2, results_dir) # beta2 from inversion
 else:
-    chk_file, csv_file = initialize(mesh, H, B, Uhat, Nhat, args, args.beta2, results_dir) # all constant
+    chk_file, csv_file = model.initialize(mesh, H, B, Uhat, Nhat, args, args.beta2, results_dir) # all constant
 with CheckpointFile(chk_file, 'r') as afile:
     mesh_ = afile.load_mesh()
     hydro.set_initial_phi(afile.load_function(mesh_, "phi"))
@@ -226,7 +228,7 @@ with df.CheckpointFile(str(results_dir/"time_series.h5"), 'w') as afile:
                 # distribute m_input to moulins
                 for ii in range(len(M_moulins)):
                     M_moulins[ii] = df.assemble(m_DG0*dx_c(ii))
-                Qm, delta_moul = hlp.moulin_dirac_from_array(mesh, x_moulin, y_moulin, M_moulins)
+                Qm, delta_moul = model.moulin_dirac_from_array(mesh, x_moulin, y_moulin, M_moulins)
                 hydro.Qm.interpolate(Qm)
                 hydro.m.interpolate(m_CG1*distributed_melt_mask)
                 hydro.m.dat.data[:] += args.m_basal
@@ -252,9 +254,9 @@ with df.CheckpointFile(str(results_dir/"time_series.h5"), 'w') as afile:
                 # afile.save_function(stokes.Ub, idx=i, name="Ub")
                 afile.save_function(coupler.U.sub(0), idx=i, name="phi")
                 afile.save_function(df.project(hydro.q_s, coupler.Q_cg_vec), idx=i, name="q")
-                Q_subDG0 = hlp.save_DGT0(mesh, hydro.Q_submesh, df.project(abs(hydro.Q),hydro.V_S), hydro.Q_save, hydro.outfile_Q, t)
+                Q_subDG0 = model.save_DGT0(mesh, hydro.Q_submesh, df.project(abs(hydro.Q),hydro.V_S), hydro.Q_save, hydro.outfile_Q, t)
                 afile.save_function(Q_subDG0, idx=i, name="Q")
-                S_subDG0 = hlp.save_DGT0(mesh, hydro.S_submesh, df.project(hydro.S,hydro.V_S), hydro.S_save, hydro.outfile_S, t)
+                S_subDG0 = model.save_DGT0(mesh, hydro.S_submesh, df.project(hydro.S,hydro.V_S), hydro.S_save, hydro.outfile_S, t)
                 afile.save_function(S_subDG0, idx=i, name="S")
                 afile.save_function(coupler.U.sub(1), idx=i, name="h")
                 afile.save_function(df.project(hydro.N, coupler.Q_cg), idx=i, name="N")
@@ -276,4 +278,4 @@ with df.CheckpointFile(str(results_dir/"time_series.h5"), 'w') as afile:
             print("Convergence not achieved.  Reducing time step to {:.1f} hours and trying again".format(hydro.dt.values()[0]*365*24))
 
 # write parameters to table:
-hlp.save_params_to_csv(args, params_output_file, success=success)
+model.save_params_to_csv(args, params_output_file, success=success)

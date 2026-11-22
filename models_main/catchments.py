@@ -2,7 +2,6 @@ import firedrake as df
 import pandas as pd
 import geopandas as gpd
 import numpy as np
-from shapely.geometry import Point
 import geoutils as gu
 
 def get_catchments(mesh, bedmachine_dir, catchment_dir, data_dir, outline_path):

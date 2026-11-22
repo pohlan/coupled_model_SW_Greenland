@@ -15,6 +15,7 @@ script_dir    = Path(__file__).resolve().parent
 project_path  = script_dir
 results_dir = project_path / "inversion_results"
 data_dir    = Path(args.data_directory)
+bedmachine_dir = data_dir / "bedmachine"
 
 from pyadjoint import get_working_tape
 get_working_tape().clear_tape()
@@ -54,7 +55,7 @@ stokes  = SpecFO(mesh, results_dir)
 coupler = Coupler_Flow(mesh, stokes)
 
 # geometry
-B, H = hlp.get_topography(mesh, args, results_dir)
+B, H = hlp.get_topography(mesh, args, bedmachine_dir, results_dir)
 S    = df.Function(coupler.Q_cg).interpolate(B+H)
 df.VTKFile(results_dir/"S.pvd").write(S)
 

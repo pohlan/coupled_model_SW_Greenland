@@ -8,7 +8,7 @@ from scipy.ndimage import gaussian_filter
 script_dir    = Path(__file__).parent
 project_path  = script_dir.parent
 data_dir        = project_path / "Greenland_data"
-bedmachine_dir  = data_dir
+bedmachine_dir  = data_dir / "bedmachine"
 bedmachine_dir = bedmachine_dir.relative_to(project_path)
 
 def load_and_smooth(name, sig=9):

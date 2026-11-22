@@ -15,7 +15,6 @@ import cmcrameri.cm as cmc
 import matplotlib.colors as colors
 from shapely.geometry import box
 import fiona
-from derive_catchments_df import *
 
 xcoords = [-205482.0,-144630.0]
 ycoords = [-2527653.0,-2.52e6]
@@ -264,7 +263,7 @@ for (i_r,(run_index,model_label,col)) in enumerate(zip(run_indices,model_labels,
         ax2.vlines(xend_winter, -0.2, 5000, color="black", ls="-.")
         ax2.annotate(r"$Q_\mathrm{\,Flux\,gate}$", xy=[datetime(year0+1,4,23), 1e-3], ha="right", rotation=90, fontsize=annotate_fs)
         y0_ax2, y1_ax2 = ax2.get_ylim()
-        ax2.fill_betweenx([y0_ax2,y1_ax2], xstart_winter, xend_winter, facecolor="grey", alpha=0.15) # cadetblue
+        ax2.fill_betweenx([y0_ax2,3000], xstart_winter, xend_winter, facecolor="grey", alpha=0.15) # cadetblue
         ax2.annotate("Winter period", xy=[0.53, 0.85], xycoords="axes fraction", color="black", fontsize=annotate_fs, fontweight="bold")
         ax2.set_ylim(y0_ax2,3000)
     panel_letter_annotation(ax2, 1, annotate_fs, xyc=(0.03, 1.04))

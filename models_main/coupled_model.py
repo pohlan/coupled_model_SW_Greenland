@@ -4,7 +4,7 @@ import firedrake as df
 from firedrake.checkpointing import CheckpointFile
 import numpy as np
 import pandas as pd
-import models_main.helpers as hlp
+from .helpers import make_subDG0, save_DGT0
 
 class VerticalBasis(object):
     def __init__(self,u,coef,dcoef):
@@ -293,8 +293,8 @@ class GLADS(object):
         self.outfile_M_fr= df.VTKFile(results_dir/"df_M_fr.pvd")
 
         # DG0 submesh function for saving channels (direct writing of DGT0 to pvd not supported at this point)
-        self.S_save, self.S_submesh = hlp.make_subDG0(mesh)
-        self.Q_save, self.Q_submesh = hlp.make_subDG0(mesh)
+        self.S_save, self.S_submesh = make_subDG0(mesh)
+        self.Q_save, self.Q_submesh = make_subDG0(mesh)
 
     def set_coupler(self,coupler):
         self.coupler = coupler
@@ -504,9 +504,9 @@ class GLADS(object):
         self.outfile_h.write(df.project(self.coupler.U.sub(1), self.V_h, name="h"), time=t)
         self.outfile_q.write(df.project(self.q_s, self.V_cg_vec, name="q"), time=t)
         self.outfile_Re.write(df.project(self.Re, self.V_h, name="Re"), time=t)
-        S_subDG0 = hlp.save_DGT0(self.mesh, self.S_submesh, self.coupler.U.sub(2), self.S_save, self.outfile_S, t)
+        S_subDG0 = save_DGT0(self.mesh, self.S_submesh, self.coupler.U.sub(2), self.S_save, self.outfile_S, t)
         self.outfile_S.write(S_subDG0, time=t)
-        Q_subDG0 = hlp.save_DGT0(self.mesh, self.Q_submesh, df.project(abs(self.Q),self.V_S), self.Q_save, self.outfile_Q, t)
+        Q_subDG0 = save_DGT0(self.mesh, self.Q_submesh, df.project(abs(self.Q),self.V_S), self.Q_save, self.outfile_Q, t)
         self.outfile_Q.write(Q_subDG0, time=t)
         self.outfile_M_fr.write(df.project(self.M_fr, self.V_phi, name="frictional_heat"), time=t)
         # self.outfile_M_fr.write(df.project(self.coupler.stokes.tau_b, self.V_phi, name="tau_bx"), time=t)
