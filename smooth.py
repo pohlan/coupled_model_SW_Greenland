@@ -5,11 +5,11 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 
 # define data paths relative to this script's location
-script_dir    = Path(__file__).parent
-project_path  = script_dir.parent
-data_dir        = project_path / "Greenland_data"
-bedmachine_dir  = data_dir / "bedmachine"
-bedmachine_dir = bedmachine_dir.relative_to(project_path)
+script_dir     = Path(__file__).parent
+project_dir    = script_dir.parent
+data_dir       = project_dir / "Greenland_data"
+bedmachine_dir = data_dir / "bedmachine"
+bedmachine_dir = bedmachine_dir.relative_to(project_dir)
 
 def load_and_smooth(name, sig=9):
     min_x = -2.5e5

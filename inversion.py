@@ -11,10 +11,10 @@ import geoutils as gu
 
 args = hlp.get_args()   # command line arguments
 
-script_dir    = Path(__file__).resolve().parent
-project_path  = script_dir
-results_dir = project_path / "inversion_results"
-data_dir    = Path(args.data_directory)
+script_dir     = Path(__file__).resolve().parent
+project_dir    = script_dir
+results_dir    = project_dir / "inversion_results"
+data_dir       = Path(args.data_directory)
 bedmachine_dir = data_dir / "bedmachine"
 
 from pyadjoint import get_working_tape
@@ -28,7 +28,7 @@ x, y = df.SpatialCoordinate(mesh)
 
 # get observations
 # for now: snapshot:
-vel_dir = project_path.parent / "GrisVels" / "data" / "MEaSUREs" / "monthly" / "raw"
+vel_dir = project_dir.parent / "GrisVels" / "data" / "MEaSUREs" / "monthly" / "raw"
 # vel_file = "GL_vel_mosaic_Monthly_01Jan21_31Jan21_vv_v05.0.tif"
 vel_file = vel_dir / "GL_vel_mosaic_Monthly_01Nov18_30Nov18_vv_v05.0.tif"
 vel_dates, Us_obs, Us_mask = load_obs_FunctionSpace([vel_file], mesh)
@@ -75,7 +75,7 @@ Nhat   = df.Constant(917*9.81*H_mean)
 # get N from model output
 run_index = args.run_index
 idx       = int(365/2*4.9)   # 4.87 = November 15, 2018; 8.041: January 2022 (new1)
-model_file = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+model_file = str(project_dir / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
 _, _, phi_raw, _, _, _, _, n_idx, N_raw = load_model_output(model_file)
 N = df.Function(coupler.Q_cg)
 N.dat.data[:] = N_raw[:, idx]
@@ -94,7 +94,7 @@ coupler = Coupler_Flow(mesh, stokes)
 coupler.set_geometry(B, H)
 stokes.set_coupler(coupler)
 stokes.build_variables()
-params = hlp.get_params_from_input_file(project_path, run_index)
+params = hlp.get_params_from_input_file(project_dir, run_index)
 pval   = params['p']
 qval   = params['q']
 beta2val   = params['beta2']

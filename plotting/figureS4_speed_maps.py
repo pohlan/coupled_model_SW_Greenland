@@ -28,23 +28,23 @@ cmap_speed = cmc.lapaz
 cmap_melt = cmc.lajolla
 
 # define data paths relative to this script's location
-script_dir = Path(__file__).resolve().parent
-project_path = script_dir.parent
-outline_path = project_path /  "Greenland_data" / "russel" / "russel_domain.gpkg"
-timeseries_path = str(project_path / "parameter_runs" / f"run_{run_indices_maps[0]}" / "time_series.h5")
-vel_dir = project_path.parent / "GrisVels" / "data" / "MEaSUREs" / "monthly" / "raw"
-fig_path     = project_path / "plotting" / "main_figures"
+script_dir      = Path(__file__).resolve().parent
+project_dir     = script_dir.parent
+outline_file    = project_dir / "domain" / "domain_outline.gpkg"
+timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_indices_maps[0]}" / "time_series.h5")
+vel_dir         = project_dir / "Greenland_data" / "MEaSUREs" / "monthly" / "raw"
+fig_dir         = project_dir / "plotting" / "main_figures"
 
 # load outline
-gdf = gpd.read_file(outline_path)
-domain_outline = gu.Vector(outline_path)
+gdf = gpd.read_file(outline_file)
+domain_outline = gu.Vector(outline_file)
 
 # load model file meshes
 mesh_, smesh_ = get_meshes(timeseries_path)
 V = df.FunctionSpace(mesh_, "CG", 1)
 
 def get_model_speed_melt(run_index, V, xstart, xend, dmonths=2):
-    timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+    timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
     us_raw, m_raw, _, _, _, _, _, n_idx, _ = load_model_output(timeseries_path)
 
     dates_model, i_model = get_model_dates(n_idx, xstart, xend)
@@ -165,4 +165,4 @@ for ii, (run_index, model_label) in enumerate(zip(run_indices_maps, model_labels
         if (iy==0) & (ii==1):
             ax.annotate("Melt forcing", xy=[0.5,1.15], xycoords="axes fraction", annotation_clip=False, fontsize=annotate_fs, fontweight="bold", ha="center", va="center")
 
-plt.savefig(fig_path / "fS04.jpg")
+plt.savefig(fig_dir / "fS04.jpg")

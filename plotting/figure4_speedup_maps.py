@@ -33,14 +33,17 @@ cmap_summer = cmc.nuuk # cmc.davos
 cmap_winter = "BrBG"
 
 # define data paths relative to this script's location
-script_dir = Path(__file__).resolve().parent
-project_path = script_dir.parent
-timeseries_path = str(project_path / "parameter_runs" / f"run_{run_indices_maps[0]}" / "time_series.h5")
-outline_path   = project_path /  "Greenland_data" / "russel" / "russel_domain.gpkg"
-vel_dir = project_path.parent / "GrisVels" / "data" / "MEaSUREs" / "monthly" / "raw"
-fig_path     = project_path / "plotting" / "main_figures"
+script_dir      = Path(__file__).resolve().parent
+project_dir     = script_dir.parent
+outline_file    = project_dir / "domain" / "domain_outline.gpkg"
+vel_dir         = project_dir / "Greenland_data" / "MEaSUREs" / "monthly" / "raw"
+bedmachine_dir  = project_dir / "Greenland_data" / "bedmachine"
+bed_file        = str(bedmachine_dir / "BedMachineGreenland-v5_bed_smooth_sig5.nc")
+thick_file      = str(bedmachine_dir / "BedMachineGreenland-v5_thickness_smooth_sig5.nc")
+timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_indices_maps[0]}" / "time_series.h5")
+fig_dir         = project_dir / "plotting" / "main_figures"
 
-gdf = gpd.read_file(outline_path)
+gdf = gpd.read_file(outline_file)
 
 # load model file meshes
 mesh_, smesh_ = get_meshes(timeseries_path)
@@ -48,7 +51,7 @@ V = df.FunctionSpace(mesh_, "CG", 1)
 
 
 def get_model_winter_speedup_field(mesh_, run_index, B, xstart, xend, xstart_summer, xend_summer, start_year=2014):
-    timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+    timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
     us_raw, _, _, _, _, _, _, n_idx, _ = load_model_output(timeseries_path)
 
     dates_model, i_model_winter = get_model_dates(n_idx, xstart, xend, start_year=start_year)
@@ -97,8 +100,8 @@ def plot_model_panel(ax, fig, gsc, ii, mesh_, run_index, model_label, B, gdf, vm
     ax.annotate("Fig. 6 \nflux gate", xy=(x0+0.5e4, ax.get_ylim()[0]-6e3), fontsize=annotate_fs, ha="center", annotation_clip=False)
     draw_contour_lines(ax)
 
-r_bed = get_topo_raster("Greenland_data/BedMachineGreenland-v5_bed_smooth_sig5.nc", outline_path)
-r_thick = get_topo_raster("Greenland_data/BedMachineGreenland-v5_thickness_smooth_sig5.nc", outline_path)
+r_bed = get_topo_raster(bed_file, outline_file)
+r_thick = get_topo_raster(thick_file, outline_file)
 r_surf  = r_bed+r_thick
 def draw_contour_lines(ax):
     data    = r_surf.data.squeeze()
@@ -158,7 +161,7 @@ for i in range(Uobs_time_summer.shape[0]):
 # xarray_da.to_netcdf(f"speedup_{year0}_{year0+1}.nc")
 
 # mask out values outside of domain
-domain_outline = gu.Vector(outline_path)
+domain_outline = gu.Vector(outline_file)
 mask_noglacier   = ~domain_outline.create_mask(raster0)
 dU_obs_winter[mask_noglacier.data.ravel()] = np.nan
 dU_obs_summer[mask_noglacier.data.ravel()] = np.nan
@@ -214,7 +217,7 @@ draw_contour_lines(ax)
 # MODEL         #
 #################
 
-B, H, S = load_topography(project_path, mesh_)
+B, H, S = load_topography(bedmachine_dir, mesh_)
 
 for ii, (run_index, gi, model_label) in enumerate(zip(run_indices_maps, [2,4], model_labels)):
     print(ii)
@@ -227,4 +230,4 @@ for ii, (run_index, gi, model_label) in enumerate(zip(run_indices_maps, [2,4], m
     plot_model_panel(ax_model, fig, gs[0,1], ii*2+3, mesh_, run_index, model_label, B, gdf, vm, annotate_fs, xstart_winter, xend_winter, xcoords, ycoords, cols, season="summer")
 
 
-plt.savefig(fig_path / "f04.jpg")
+plt.savefig(fig_dir / "f04.jpg")

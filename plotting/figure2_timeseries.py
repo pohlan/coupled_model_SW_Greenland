@@ -11,11 +11,13 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 
 # define data paths relative to this script's location
-script_dir = Path(__file__).resolve().parent
-project_path = script_dir.parent
-flowlines_dir = project_path / "Greenland_data" / "profiles"
-vel_dir = project_path.parent / "GrisVels" / "data" / "MEaSUREs" / "monthly" / "raw"
-fig_path       = project_path / "plotting" / "main_figures"
+script_dir     = Path(__file__).resolve().parent
+project_dir    = script_dir.parent
+data_dir       = project_dir / "Greenland_data"
+flowlines_dir  = data_dir / "profiles"
+vel_dir        = data_dir / "MEaSUREs" / "monthly" / "raw"
+bedmachine_dir = project_dir / "Greenland_data" / "bedmachine"
+fig_dir        = project_dir / "plotting" / "main_figures"
 
 # whether to plot Fig. 2 in main document or same figure for different points as in supplements
 fig_mode = ["main","Orkendalen_Glacier5", "Isunnguata_Glacier5"][0]
@@ -87,9 +89,9 @@ for (gl_name, d, delta) in zip(glacier_names, ds_upglacier, deltas_upglacier):
     y_points.append(yy[idx_profiles])
 
 # load model stuff not run-specific
-timeseries_path = str(project_path / "parameter_runs" / f"run_{run_indices[0]}" / "time_series.h5")
+timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_indices[0]}" / "time_series.h5")
 mesh_, smesh_ = get_meshes(timeseries_path)
-B, H, S = load_topography(project_path, mesh_)
+B, H, S = load_topography(bedmachine_dir, mesh_)
 
 # get velocity observation files sorted after date
 files   = glob.glob(str(vel_dir/"*vv*.tif"))
@@ -121,10 +123,10 @@ for (i,(glacier_name,l_title)) in enumerate(zip(unique_gl_names,title_bar_length
     i0 += l_title
 
 for (run_index,color,model_label,model_start) in zip(run_indices, colors, model_labels, model_start_years):
-    timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+    timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
     # load model output from hdf5 file
     mesh_, smesh_ = get_meshes(timeseries_path)
-    B, H, S = load_topography(project_path, mesh_)
+    B, H, S = load_topography(bedmachine_dir, mesh_)
     us_raw, m_raw, phi_raw, h_raw, q_raw, Q_raw, S_raw, n_idx, _ = load_model_output(timeseries_path)
 
     for (ig,(gl_name, d_along_profile, delta, Uobs, xc, yc)) in enumerate(zip(glacier_names, ds_upglacier, deltas_upglacier, zip(*Uobs_glaciers), x_points, y_points)):
@@ -200,4 +202,4 @@ for (run_index,color,model_label,model_start) in zip(run_indices, colors, model_
             lax.axis("off")
 
 plt.tight_layout(pad=0.4)
-plt.savefig(fig_path / f"{figname[run_indices[0]]}.jpg")
+plt.savefig(fig_dir / f"{figname[run_indices[0]]}.jpg")

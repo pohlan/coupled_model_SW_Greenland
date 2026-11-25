@@ -19,47 +19,49 @@ import fiona
 fig_mode = ["main", "turb_vs_transition", "Re_omega", "three_catchments", "more_smoothing"][0]
 
 # define data paths relative to this script's location
-script_dir    = Path(__file__).resolve().parent
-project_path  = script_dir.parent
-data_path     = project_path /  "Greenland_data" / "russel"
-outline_path  = data_path / "russel_domain.gpkg"
-outline_small = data_path / "domain_smaller.gpkg"
-outline_Mank  = data_path / "domain_Mankoff_k09_5glaciers.gpkg"
-bed_path = str(project_path /  "Greenland_data" / "BedMachineGreenland-v5_bed_smooth_sig5.nc")
-thick_path = str(project_path /  "Greenland_data" / "BedMachineGreenland-v5_thickness_smooth_sig5.nc")
-fig_path       = project_path / "plotting" / "main_figures"
+script_dir     = Path(__file__).resolve().parent
+project_dir    = script_dir.parent
+domain_dir     = project_dir / "domain"
+outline_file   = domain_dir / "domain_outline.gpkg"
+outline_small  = domain_dir / "domain_smaller.gpkg"
+outline_Mank   = domain_dir / "domain_Mankoff_k09_5glaciers.gpkg"
+data_dir       = project_dir /  "Greenland_data"
+bedmachine_dir = data_dir / "bedmachine"
+bed_file       = str(bedmachine_dir / "BedMachineGreenland-v5_bed_smooth_sig5.nc")
+thick_file     = str(bedmachine_dir / "BedMachineGreenland-v5_thickness_smooth_sig5.nc")
+fig_dir        = project_dir / "plotting" / "main_figures"
 
 draw_Q = True
 if fig_mode == "main":
     run_indices = [312,706]
     model_labels  = ["Baseline", "Reduced\nsheet flow"]
     fig_height = 13
-    outline_paths = [outline_path, outline_path]
+    outline_paths = [outline_file, outline_file]
     figname = "f03"
 elif fig_mode == "turb_vs_transition":
     run_indices = [602,706]
     model_labels  = ["Turbulent", "Reduced\nsheet flow"]
     fig_height = 13
-    outline_paths = [outline_path, outline_path]
+    outline_paths = [outline_file, outline_file]
     figname = "fS12"
 elif fig_mode == "Re_omega":
     run_indices = [706]
     model_labels  = ["Reduced\nsheet flow"]
     fig_height = 8
-    outline_paths = [outline_path]
+    outline_paths = [outline_file]
     figname = "fS13"
     draw_Q = False
 elif fig_mode == "more_smoothing":
     run_indices = [718,706]
     model_labels  = ["More\nsmoothing", "Reduced\nsheet flow"]
     fig_height = 13
-    outline_paths = [outline_path, outline_path]
+    outline_paths = [outline_file, outline_file]
     figname = "fS24"
 elif fig_mode == "three_catchments":
     run_indices = [706,711,712]
     model_labels  = ["Red. sheet\nflow", "Smaller\ndomain", "Larger\ndomain"]
     fig_height = 19
-    outline_paths = [outline_path, outline_small, outline_Mank]
+    outline_paths = [outline_file, outline_small, outline_Mank]
     figname = "fS20"
 
 # minimum discharge at which to draw channels
@@ -129,7 +131,7 @@ def get_Q_lines(Q_vals, ax, cax, coords):
 # Create figure and plot
 Ly = np.zeros(len(run_indices))
 for (i,r) in enumerate(run_indices):
-    tp = str(project_path / "parameter_runs" / f"run_{r}" / "time_series.h5")
+    tp = str(project_dir / "parameter_runs" / f"run_{r}" / "time_series.h5")
     mesh_, smesh_ = get_meshes(tp)
     meshx, meshy = zip(*get_coordinates(mesh_, "CG", 1))
     Ly[i] = np.max(meshy) - np.min(meshy)
@@ -140,7 +142,7 @@ gs = fig.add_gridspec(len(run_indices), 3, left=0.15, right=0.91, top=0.9, botto
 
 for (i_r,(run_index,outline_path)) in enumerate(zip(run_indices,outline_paths)):
     # load model output
-    timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+    timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
     mesh_, smesh_ = get_meshes(timeseries_path)
     coords = smesh_.coordinates.dat.data  # mesh coordinates
     us_raw, m_raw, phi_raw, h_raw, q_raw, Q_raw, _, n_idx, _ = load_model_output(timeseries_path)
@@ -215,8 +217,8 @@ for (i_r,(run_index,outline_path)) in enumerate(zip(run_indices,outline_paths)):
         min_y, max_y = np.min(meshy), np.max(meshy)
         remove_axes(ax, ylims=(min_y,max_y), xlims=(min_x, min_x+0.5*(max_x-min_x)))
 
-        r_bed = get_topo_raster(bed_path, outline_path)
-        r_thick = get_topo_raster(thick_path, outline_path)
+        r_bed = get_topo_raster(bed_file, outline_path)
+        r_thick = get_topo_raster(thick_file, outline_path)
         r_surf  = r_bed+r_thick
         data    = r_surf.data.squeeze()
         x, y    = r_surf.coords(grid=False)
@@ -242,4 +244,4 @@ for (i_r,(run_index,outline_path)) in enumerate(zip(run_indices,outline_paths)):
             ax.annotate(season, xy=[0.6,y_offset], xycoords="axes fraction", annotation_clip=False, fontsize=annotate_fs, fontweight="bold", ha="center", va="center")
         ax.annotate(f"{idx_to_letter(i_r*2+i_s)}", xy=(0.03,1.05), xycoords="axes fraction", fontsize=annotate_fs*0.9, fontweight="bold")
 
-plt.savefig(fig_path / f"{figname}.jpg")
+plt.savefig(fig_dir / f"{figname}.jpg")

@@ -46,15 +46,16 @@ def Softplus(a,b,alpha=1): return Max(a,b) + 1./alpha*df.ln(1 + df.exp(-abs(a-b)
 
 
 class SpecFO(object):
-    def __init__(self,mesh,results_dir='./results/'):
+    def __init__(self,mesh,results_dir=None):
         E_cg = self.E_cg = df.FiniteElement("CG",mesh.ufl_cell(),1)
         self.elements = [E_cg]*4
 
-        # create output files
-        self.results_dir = results_dir
-        self.Us_file = df.VTKFile(results_dir/"df_U_s.pvd")
-        self.Ub_file = df.VTKFile(results_dir/"df_U_b.pvd")
-        # self.tau_b_file = df.VTKFile(results_dir/"df_taub.pvd")
+        if results_dir is not None:
+            # create output files
+            self.results_dir = results_dir
+            self.Us_file = df.VTKFile(results_dir/"df_U_s.pvd")
+            self.Ub_file = df.VTKFile(results_dir/"df_U_b.pvd")
+            # self.tau_b_file = df.VTKFile(results_dir/"df_taub.pvd")
 
     def set_coupler(self,coupler):
         self.coupler = coupler
@@ -259,13 +260,14 @@ class SpecFO(object):
         self.Us.dat.data[:] = Us_temp.dat.data_ro
         self.Ub.dat.data[:] = Ub_temp.dat.data_ro
         # self.tau_b_save.dat.data[:] = tau_b_temp.dat.data_ro
+        # ToDo: throw error if Us_file not defined --> in that case results_dir was not provided at initialization
         self.Us_file.write(self.Us, time=t)
         self.Ub_file.write(self.Ub, time=t)
         # self.tau_b_file.write(self.tau_b_save, time=t)
 
 
 class GLADS(object):
-    def __init__(self,mesh, results_dir):
+    def __init__(self,mesh, results_dir=None):
         self.mesh     = mesh
         E_phi         = df.FiniteElement("CG", mesh.ufl_cell(), 1)
         E_h           = df.FiniteElement("CG", mesh.ufl_cell(),1)
@@ -278,19 +280,20 @@ class GLADS(object):
         self.V_h      = df.FunctionSpace(mesh,E_h)
         self.V_S      = df.FunctionSpace(mesh,E_S)
 
-        # create output files
-        self.results_dir = results_dir
-        self.outfile_m   = df.VTKFile(results_dir/"df_m.pvd")
-        self.outfile_phi = df.VTKFile(results_dir/"df_phi.pvd")
-        self.outfile_pw_pi = df.VTKFile(results_dir/"df_pw_pi.pvd")
-        self.outfile_N   = df.VTKFile(results_dir/"df_N.pvd")
-        self.outfile_Qm  = df.VTKFile(results_dir/"df_Qm.pvd")
-        self.outfile_h   = df.VTKFile(results_dir/"df_h.pvd")
-        self.outfile_q   = df.VTKFile(results_dir/"df_q.pvd")
-        self.outfile_Re  = df.VTKFile(results_dir/"df_Re.pvd")
-        self.outfile_S   = df.VTKFile(results_dir/"df_S.pvd")
-        self.outfile_Q   = df.VTKFile(results_dir/"df_Q.pvd")
-        self.outfile_M_fr= df.VTKFile(results_dir/"df_M_fr.pvd")
+        if results_dir is not None:
+            # create output files
+            self.results_dir = results_dir
+            self.outfile_m   = df.VTKFile(results_dir/"df_m.pvd")
+            self.outfile_phi = df.VTKFile(results_dir/"df_phi.pvd")
+            self.outfile_pw_pi = df.VTKFile(results_dir/"df_pw_pi.pvd")
+            self.outfile_N   = df.VTKFile(results_dir/"df_N.pvd")
+            self.outfile_Qm  = df.VTKFile(results_dir/"df_Qm.pvd")
+            self.outfile_h   = df.VTKFile(results_dir/"df_h.pvd")
+            self.outfile_q   = df.VTKFile(results_dir/"df_q.pvd")
+            self.outfile_Re  = df.VTKFile(results_dir/"df_Re.pvd")
+            self.outfile_S   = df.VTKFile(results_dir/"df_S.pvd")
+            self.outfile_Q   = df.VTKFile(results_dir/"df_Q.pvd")
+            self.outfile_M_fr= df.VTKFile(results_dir/"df_M_fr.pvd")
 
         # DG0 submesh function for saving channels (direct writing of DGT0 to pvd not supported at this point)
         self.S_save, self.S_submesh = make_subDG0(mesh)
@@ -504,9 +507,9 @@ class GLADS(object):
         self.outfile_h.write(df.project(self.coupler.U.sub(1), self.V_h, name="h"), time=t)
         self.outfile_q.write(df.project(self.q_s, self.V_cg_vec, name="q"), time=t)
         self.outfile_Re.write(df.project(self.Re, self.V_h, name="Re"), time=t)
-        S_subDG0 = save_DGT0(self.mesh, self.S_submesh, self.coupler.U.sub(2), self.S_save, self.outfile_S, t)
+        S_subDG0 = save_DGT0(self.mesh, self.S_submesh, self.coupler.U.sub(2), self.S_save)
         self.outfile_S.write(S_subDG0, time=t)
-        Q_subDG0 = save_DGT0(self.mesh, self.Q_submesh, df.project(abs(self.Q),self.V_S), self.Q_save, self.outfile_Q, t)
+        Q_subDG0 = save_DGT0(self.mesh, self.Q_submesh, df.project(abs(self.Q),self.V_S), self.Q_save)
         self.outfile_Q.write(Q_subDG0, time=t)
         self.outfile_M_fr.write(df.project(self.M_fr, self.V_phi, name="frictional_heat"), time=t)
         # self.outfile_M_fr.write(df.project(self.coupler.stokes.tau_b, self.V_phi, name="tau_bx"), time=t)

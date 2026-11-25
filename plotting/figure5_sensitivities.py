@@ -56,11 +56,11 @@ xcoords = [-205482.0,-144630.0]
 ycoords = [-2527653.0,-2.52e6]
 
 # define data paths relative to this script's location
-script_dir = Path(__file__).resolve().parent
-project_path = script_dir.parent
-timeseries_path = str(project_path / "parameter_runs" / f"run_{run_indices_timeseries[0]}" / "time_series.h5")
-vel_dir = project_path.parent / "GrisVels" / "data" / "MEaSUREs" / "monthly" / "raw"
-fig_path     = project_path / "plotting" / "main_figures"
+script_dir      = Path(__file__).resolve().parent
+project_dir     = script_dir.parent
+timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_indices_timeseries[0]}" / "time_series.h5")
+vel_dir         = project_dir / "Greenland_data" / "MEaSUREs" / "monthly" / "raw"
+fig_dir         = project_dir / "plotting" / "main_figures"
 
 mesh_, smesh_ = get_meshes(timeseries_path)
 
@@ -104,7 +104,7 @@ topax.annotate("Point B", xy=[0.5,0.4], fontsize=annotate_fs*1.2, fontweight="bo
 # point A
 ax_w = fig.add_subplot(gs[1, 0])
 ax_s = fig.add_subplot(gs[3, 0])
-plot_sensitivity_panel(project_path, ax_w, ax_s, mesh_, vel_dir, run_indices_suit, var, "m_basal", xstart_winter, xend_winter, xstart_summer, xend_summer, [[xcoords[0]]], [[ycoords[0]]], colors, 0,
+plot_sensitivity_panel(project_dir, ax_w, ax_s, mesh_, vel_dir, run_indices_suit, var, "m_basal", xstart_winter, xend_winter, xstart_summer, xend_summer, [[xcoords[0]]], [[ycoords[0]]], colors, 0,
                        run_indices_timeseries, param_units, param_labels, xscale=xscale, legend=False, annotate_fs=annotate_fs, ylims_w=ylims_w, ylims_s=ylims_s)
 ylims_w_A = ax_w.get_ylim()
 ylims_s_A = ax_s.get_ylim()
@@ -115,7 +115,7 @@ ax_s.annotate("Max. summer\nspeed anomaly", xy=[-0.35, 0.5], xycoords="axes frac
 # point B
 ax_w = fig.add_subplot(gs[1, 1])
 ax_s = fig.add_subplot(gs[3, 1])
-plot_sensitivity_panel(project_path, ax_w, ax_s, mesh_, vel_dir, run_indices_suit, var, "m_basal", xstart_winter, xend_winter, xstart_summer, xend_summer, [[xcoords[1]]], [[ycoords[1]]], colors, 1,
+plot_sensitivity_panel(project_dir, ax_w, ax_s, mesh_, vel_dir, run_indices_suit, var, "m_basal", xstart_winter, xend_winter, xstart_summer, xend_summer, [[xcoords[1]]], [[ycoords[1]]], colors, 1,
                        run_indices_timeseries, param_units, param_labels, xscale=xscale, labelloc=(0.2,0.6), legend=True, annotate_fs=annotate_fs, ylims_w=ylims_w_A, ylims_s=ylims_s_A, scatter_annotate=True)
 
 
@@ -126,15 +126,15 @@ plot_sensitivity_panel(project_path, ax_w, ax_s, mesh_, vel_dir, run_indices_sui
 # A
 labels = ["Lowest " + param_labels[var],"Highest " + param_labels[var],"Red. sheet flow"]
 ax = fig.add_subplot(gs[5, 0])
-plot_timeseries_panel(project_path, ax, mesh_, vel_dir, run_indices_timeseries, labels, xstart_winter, xend_winter, xstart_summer, xend_winter, [[xcoords[0]]], [[ycoords[0]]], 4,
+plot_timeseries_panel(project_dir, ax, mesh_, vel_dir, run_indices_timeseries, labels, xstart_winter, xend_winter, xstart_summer, xend_winter, [[xcoords[0]]], [[ycoords[0]]], 4,
                       param_units, param_labels, annotate_fs=annotate_fs, legend=False)
 ylims_speed = ax.get_ylim()
 
 # B
 ax = fig.add_subplot(gs[5, 1])
-plot_timeseries_panel(project_path, ax, mesh_, vel_dir, run_indices_timeseries, labels, xstart_winter, xend_winter, xstart_summer, xend_winter, [[xcoords[1]]], [[ycoords[1]]], 5,
+plot_timeseries_panel(project_dir, ax, mesh_, vel_dir, run_indices_timeseries, labels, xstart_winter, xend_winter, xstart_summer, xend_winter, [[xcoords[1]]], [[ycoords[1]]], 5,
                       param_units, param_labels, ylims=ylims_speed, annotate_fs=annotate_fs)
 
 
 # save
-plt.savefig(fig_path / f"{figname}.jpg")
+plt.savefig(fig_dir / f"{figname}.jpg")

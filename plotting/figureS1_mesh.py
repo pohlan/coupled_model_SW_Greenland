@@ -14,9 +14,12 @@ import fiona
 fontsize = 37
 
 script_dir   = Path(__file__).resolve().parent
-project_path = script_dir.parent
-hydro_file   = project_path / "Greenland_data" / "russel" / "hydrological_outlets_russel.gpkg"
-fig_path     = project_path / "plotting" / "main_figures"
+project_dir  = script_dir.parent
+domain_dir   = project_dir / "domain"
+outline_file = domain_dir / "domain_outline.gpkg"
+hydro_file   = domain_dir / "hydrological_outlets.gpkg"
+mesh_file    = domain_dir / "mesh.msh"
+fig_dir      = project_dir / "plotting" / "main_figures"
 
 hydro_points = fiona.open(hydro_file, mode="r")
 hydro_x = np.array([i['geometry']['coordinates'][0] for i in list(hydro_points.values())])
@@ -29,7 +32,7 @@ fig, ax2 = plt.subplots(1,1,figsize=(17, 8))
 # Mesh  #
 #########
 
-mesh = df.Mesh("Greenland_data/russel/russel.msh")
+mesh = df.Mesh(str(mesh_file))
 colors = triplot(mesh, axes=ax2)
 ax2.set_aspect('equal')
 ax2.set_xticks([])
@@ -120,4 +123,4 @@ mark_inset(
 ax2.scatter(hydro_x,hydro_y, 80, color="red", zorder=2)
 
 plt.tight_layout()
-plt.savefig(fig_path / "fS01.jpg")
+plt.savefig(fig_dir / "fS01.jpg")

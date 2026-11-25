@@ -21,15 +21,17 @@ model_labels  = ["Baseline", "Reduced \nsheet flow"]
 glacier_ids = [1,2,3,4,5]
 
 # define data paths relative to this script's location
-script_dir = Path(__file__).resolve().parent
-project_path = script_dir.parent
-flowlines_dir = project_path / "Greenland_data" / "profiles"
-vel_dir = project_path.parent / "GrisVels" / "data" / "MEaSUREs" / "monthly" / "raw"
-outline_path  = project_path /  "Greenland_data" / "russel" / "russel_domain.gpkg"
-outline_GrIS_path = project_path / "Greenland_data" / "gris-outline-imbie-1980_updated_crs.shp"
-bed_path = str(project_path /  "Greenland_data" / "BedMachineGreenland-v5_bed_smooth_sig5.nc")
-thick_path = str(project_path /  "Greenland_data" / "BedMachineGreenland-v5_thickness_smooth_sig5.nc")
-fig_path       = project_path / "plotting" / "main_figures"
+script_dir        = Path(__file__).resolve().parent
+project_dir       = script_dir.parent
+outline_file      = project_dir / "domain" / "domain_outline.gpkg"
+data_dir          = project_dir / "Greenland_data"
+flowlines_dir     = data_dir / "profiles"
+vel_dir           = data_dir / "MEaSUREs" / "monthly" / "raw"
+outline_GrIS_file = data_dir / "gris-outline-imbie-1980_updated_crs.shp"
+bedmachine_dir    = data_dir / "bedmachine"
+bed_file          = str(bedmachine_dir / "BedMachineGreenland-v5_bed_smooth_sig5.nc")
+thick_file        = str(bedmachine_dir / "BedMachineGreenland-v5_thickness_smooth_sig5.nc")
+fig_dir           = project_dir / "plotting" / "main_figures"
 
 # profile width and interval
 profile_width = 1e3
@@ -55,9 +57,9 @@ col_vlines = 'limegreen'
 lw_vlines = 5
 
 # load model stuff not run-specific
-timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index1}" / "time_series.h5")
+timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_index1}" / "time_series.h5")
 mesh_, smesh_ = get_meshes(timeseries_path)
-B, H, S = load_topography(project_path, mesh_)
+B, H, S = load_topography(bedmachine_dir, mesh_)
 
 # prepare figure, gridspecs
 fig = plt.figure(figsize=(len(glacier_ids)*8,46))
@@ -71,11 +73,11 @@ def get_topo(file):
     r = gu.Raster(file)
     # delta = r.res[0]*2
     r.crop([-2.4e5, -2.585e6, 0, -2.47e6], inplace=True)
-    outline = gu.Vector(outline_path)
+    outline = gu.Vector(outline_file)
     mask   = ~outline.create_mask(r)
     r.set_mask(mask)
     return r
-r_bed = get_topo(bed_path)
+r_bed = get_topo(bed_file)
 
 # data    = r_bed.data.squeeze()
 # x, y    = r_bed.coords(grid=False)
@@ -85,7 +87,7 @@ im = tripcolor(B, axes=topax, cmap="terrain")
 # format
 remove_axes(topax, xlims=(-2.4e5,-2e4), ylims=(-2.58e6,-2.472e6))
 # domain outline
-gdf = gpd.read_file(outline_path)
+gdf = gpd.read_file(outline_file)
 gdf.plot(ax=topax, facecolor='none', edgecolor='black', linewidth=1, label='Domain')
 
 # colorbar
@@ -106,7 +108,7 @@ cax.set_position([
 # Surface elevation  #
 ######################
 
-r_thick = get_topo(thick_path)
+r_thick = get_topo(thick_file)
 r_surf  = r_bed+r_thick
 data    = r_surf.data.squeeze()
 x, y    = r_surf.coords(grid=False)
@@ -183,7 +185,6 @@ im = tripcolor(m, axes=topax2, norm=LogNorm(vmin=1e-3, vmax=12), cmap=cmc.batlow
 # format
 remove_axes(topax2, xlims=(-2.4e5,-2e4), ylims=(-2.58e6,-2.472e6))
 # domain outline
-gdf = gpd.read_file(outline_path)
 gdf.plot(ax=topax2, facecolor='none', edgecolor='black', linewidth=1, label='Domain')
 
 # colorbar
@@ -233,7 +234,7 @@ fig.tight_layout()
 # plot bed topography
 axins2 = fig.add_subplot(gs_top[0:2,2])
 
-gdf_GrIS = gpd.read_file(outline_GrIS_path)
+gdf_GrIS = gpd.read_file(outline_GrIS_file)
 gdf_GrIS.plot(ax=axins2, facecolor='none', edgecolor='black', linewidth=0.5)
 
 gdf.plot(ax=axins2, facecolor='firebrick', alpha=0.8, edgecolor='black', linewidth=2)
@@ -281,7 +282,7 @@ for (ig,(gl,gl_name,d_vline)) in enumerate(zip(glacier_ids,glacier_names,ds_vlin
     # #########################
 
     for (i_run,(run_index,model_start_yr)) in enumerate(zip([run_index1,run_index2],model_start_yrs)):
-        timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+        timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
 
         # load model output from hdf5 file
         us_raw, m_raw, phi_raw, _, q_raw, Q_raw, S_raw, n_idx, _ = load_model_output(timeseries_path)
@@ -418,4 +419,4 @@ for (ig,(gl,gl_name,d_vline)) in enumerate(zip(glacier_ids,glacier_names,ds_vlin
     if len(d_vline) > 0:
         ax4.vlines(x=d_vline*1e-3, ymin=ax4.get_ylim()[0], ymax=ax4.get_ylim()[1], color=col_vlines, linestyle='-', lw=lw_vlines)
 
-plt.savefig(fig_path / "f01.jpg")
+plt.savefig(fig_dir / "f01.jpg")

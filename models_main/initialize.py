@@ -16,7 +16,7 @@ timestep_reduction_fraction = 0.5
 def initialize(mesh, H, B, Uhat, Nhat, args, beta2, results_dir):
 
     # initiate classes
-    hydro   = GLADS(mesh, results_dir)
+    hydro   = GLADS(mesh)
     coupler = Coupler_Hydro(mesh, hydro)
 
     # set geometries and variables
@@ -75,8 +75,8 @@ def initialize(mesh, H, B, Uhat, Nhat, args, beta2, results_dir):
     print("Initializing coupled model..")
 
     # initiate classes
-    hydro   = GLADS(mesh, results_dir)
-    stokes  = SpecFO(mesh, results_dir)
+    hydro   = GLADS(mesh)
+    stokes  = SpecFO(mesh)
     coupler = Coupler_Flow_Hydro(mesh, stokes, hydro)
 
     # set geometries and variables

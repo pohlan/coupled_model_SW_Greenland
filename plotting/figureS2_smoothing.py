@@ -13,10 +13,11 @@ from firedrake.pyplot import tripcolor
 
 # define data paths relative to this script's location
 script_dir      = Path(__file__).resolve().parent
-project_path    = script_dir.parent
-outline_path    = project_path /  "Greenland_data" / "russel" / "russel_domain.gpkg"
-bedmachine_path = str(project_path /  "Greenland_data" / "BedMachineGreenland-v5.nc")
-fig_path        = project_path / "plotting" / "main_figures"
+project_dir     = script_dir.parent
+bedmachine_dir  = project_dir /  "Greenland_data" / "bedmachine"
+bedmachine_file = str(bedmachine_dir / "BedMachineGreenland-v5.nc")
+outline_file    = project_dir / "domain" / "domain_outline.gpkg"
+fig_dir         = project_dir / "plotting" / "main_figures"
 
 
 # plotting parameters
@@ -25,9 +26,9 @@ plt.rcParams['font.size'] = 30
 annotate_fs = 30
 
 # load model stuff not run-specific
-timeseries_path = str(project_path / "parameter_runs" / "run_706" / "time_series.h5")
+timeseries_path = str(project_dir / "parameter_runs" / "run_706" / "time_series.h5")
 mesh_, smesh_ = get_meshes(timeseries_path)
-B, H, S = load_topography(project_path, mesh_)
+B, H, S = load_topography(bedmachine_dir, mesh_)
 
 # prepare figure, gridspecs
 fig = plt.figure(figsize=(20,10))
@@ -41,7 +42,7 @@ def get_topo(file):
     r = gu.Raster(file)
     # delta = r.res[0]*2
     r.crop([-2.4e5, -2.585e6, 0, -2.47e6], inplace=True)
-    outline = gu.Vector(outline_path)
+    outline = gu.Vector(outline_file)
     mask   = ~outline.create_mask(r)
     r.set_mask(mask)
     return r
@@ -60,18 +61,17 @@ cbar.set_label("Bed elevation (m)")
 vmin, vmax = cbar.mappable.get_clim()
 
 remove_axes(ax1)
-gdf = gpd.read_file(outline_path)
+gdf = gpd.read_file(outline_file)
 gdf.plot(ax=ax1, facecolor='none', edgecolor='black', linewidth=1, label='Domain')
 
 # original
-r_bed = get_topo("NETCDF:"+bedmachine_path+":bed")
+r_bed = get_topo("NETCDF:"+bedmachine_file+":bed")
 data    = r_bed.data.squeeze()
 x, y    = r_bed.coords(grid=False)
 im = ax2.pcolormesh(x, np.flip(y), data, cmap="terrain", vmin=vmin, vmax=vmax)
 cbar = fig.colorbar(im, ax=ax2)
 cbar.set_label("Bed elevation (m)")
 remove_axes(ax2)
-gdf = gpd.read_file(outline_path)
 gdf.plot(ax=ax2, facecolor='none', edgecolor='black', linewidth=1, label='Domain')
 
 # # for printing elevation of deepest bed point on Isunnguata Sermia
@@ -112,22 +112,20 @@ cbar.set_label("Ice thickness (m)")
 vmin, vmax = cbar.mappable.get_clim()
 
 remove_axes(ax1)
-gdf = gpd.read_file(outline_path)
 gdf.plot(ax=ax1, facecolor='none', edgecolor='black', linewidth=1, label='Domain')
 
 # original
-r_bed = get_topo("NETCDF:"+bedmachine_path+":thickness")
+r_bed = get_topo("NETCDF:"+bedmachine_file+":thickness")
 data    = r_bed.data.squeeze()
 x, y    = r_bed.coords(grid=False)
 im = ax2.pcolormesh(x, np.flip(y), data, cmap=cmc.oslo, vmin=vmin, vmax=vmax)
 cbar = fig.colorbar(im, ax=ax2)
 cbar.set_label("Ice thickness (m)")
 remove_axes(ax2)
-gdf = gpd.read_file(outline_path)
 gdf.plot(ax=ax2, facecolor='none', edgecolor='black', linewidth=1, label='Domain')
 
 panel_letter_annotation(ax1, 2, annotate_fs)
 panel_letter_annotation(ax2, 3, annotate_fs)
 
 
-plt.savefig(fig_path / "fS02.jpg")
+plt.savefig(fig_dir / "fS02.jpg")

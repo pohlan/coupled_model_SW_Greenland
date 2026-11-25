@@ -9,15 +9,15 @@ from matplotlib.lines import Line2D
 from plotting.plotting_functions import *
 
 # define data paths relative to this script's location
-script_dir    = Path(__file__).resolve().parent
-project_path  = script_dir.parent
-data_path     = project_path /  "Greenland_data" / "russel"
-outline_path  = data_path / "russel_domain.gpkg"
-outline_small = data_path / "domain_smaller.gpkg"
-outline_Mank  = data_path / "domain_Mankoff_k09_5glaciers.gpkg"
-catchments_Yang    = project_path / "Greenland_data" / "Yang_Smith_2016" / "ds01" / "catchments_LC80070132013231LGN00_B8.shp"
-catchments_Mankoff = data_path / "basins_Mankoff_k_0.9.gpkg"
-fig_path       = project_path / "plotting" / "main_figures"
+script_dir         = Path(__file__).resolve().parent
+project_dir        = script_dir.parent
+domain_dir         = project_dir /  "domain"
+outline_path       = domain_dir / "domain_outline.gpkg"
+outline_small      = domain_dir / "domain_smaller.gpkg"
+outline_Mank       = domain_dir / "domain_Mankoff_k09_5glaciers.gpkg"
+catchments_Yang    = project_dir / "Greenland_data" / "Yang_Smith_2016" / "ds01" / "catchments_LC80070132013231LGN00_B8.shp"
+catchments_Mankoff = project_dir / "Greenland_data" / "Mankoff2020" / "basins_Mankoff_k_0.9.gpkg"
+fig_dir            = project_dir / "plotting" / "main_figures"
 
 # plotting parameters
 ylims=(-2.62e6,-2.47e6)
@@ -68,5 +68,5 @@ remove_axes(ax2, ylims=ylims)
 ax2.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.01), handlelength=1)
 ax2.annotate(f"{idx_to_letter(1)}", xy=(0.03, 0.95), xycoords="axes fraction", fontsize=annotate_fs*0.9, fontweight="bold", annotation_clip=False)
 
-plt.savefig(fig_path / "fS19.jpg")
+plt.savefig(fig_dir / "fS19.jpg")
 

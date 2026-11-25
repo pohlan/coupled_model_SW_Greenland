@@ -26,24 +26,25 @@ marker_size = 115
 cmap_summer = cmc.nuuk
 
 # define data paths relative to this script's location
-script_dir = Path(__file__).resolve().parent
-project_path = script_dir.parent
-outline_path = project_path /  "Greenland_data" / "russel" / "russel_domain.gpkg"
-timeseries_path = str(project_path / "parameter_runs" / f"run_{run_indices_maps[0]}" / "time_series.h5")
-vel_dir = project_path.parent / "GrisVels" / "data" / "MEaSUREs" / "monthly" / "raw"
-fig_path     = project_path / "plotting" / "main_figures"
+script_dir      = Path(__file__).resolve().parent
+project_dir     = script_dir.parent
+outline_file    = project_dir / "domain" / "domain_outline.gpkg"
+timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_indices_maps[0]}" / "time_series.h5")
+vel_dir         = project_dir / "Greenland_data" / "MEaSUREs" / "monthly" / "raw"
+bedmachine_dir  = project_dir / "Greenland_data" / "bedmachine"
+fig_dir         = project_dir / "plotting" / "main_figures"
 
 # load outline
-gdf = gpd.read_file(outline_path)
-domain_outline = gu.Vector(outline_path)
+gdf = gpd.read_file(outline_file)
+domain_outline = gu.Vector(outline_file)
 
 # load model file meshes
 mesh_, smesh_ = get_meshes(timeseries_path)
-B, H, S = load_topography(project_path, mesh_)
+B, H, S = load_topography(bedmachine_dir, mesh_)
 V = df.FunctionSpace(mesh_, "CG", 1)
 
 def get_model_winter_speedup_field(mesh_, run_index, B, xstart, xend, xstart_summer, xend_summer, start_year=2014):
-    timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+    timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
     us_raw, _, _, _, _, _, _, n_idx, _ = load_model_output(timeseries_path)
 
     dates_model_winter, i_model_winter = get_model_dates(n_idx, xstart, xend, start_year=start_year)
@@ -187,5 +188,5 @@ for (iy,yr) in enumerate(years_0):
                 ax.annotate(model_label, xy=[0.5,1.25], xycoords="axes fraction", annotation_clip=False, fontsize=annotate_fs, fontweight="bold", ha="center", va="center")
 
 
-fig_w.savefig(fig_path / "fS06.jpg")
-fig_s.savefig(fig_path / "fS07.jpg")
+fig_w.savefig(fig_dir / "fS06.jpg")
+fig_s.savefig(fig_dir / "fS07.jpg")

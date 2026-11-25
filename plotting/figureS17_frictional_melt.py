@@ -21,10 +21,10 @@ lw = 2.5
 clims = (20,300)
 
 # define data paths relative to this script's location
-script_dir = Path(__file__).resolve().parent
-project_path = script_dir.parent
-outline_path   = project_path /  "Greenland_data" / "russel" / "russel_domain.gpkg"
-fig_path       = project_path / "plotting" / "main_figures"
+script_dir   = Path(__file__).resolve().parent
+project_dir  = script_dir.parent
+outline_file = project_dir / "domain" / "domain_outline.gpkg"
+fig_dir      = project_dir / "plotting" / "main_figures"
 
 year = 2020
 xstart, xend = datetime(year-1,4,2), datetime(year-1,10,30)
@@ -35,7 +35,7 @@ fig.subplots_adjust(left=0.0, right=1.0, bottom=0.01, top=0.99)
 
 # load model stuff not run-specific
 run_index = 715
-timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
 mesh_, smesh_ = get_meshes(timeseries_path)
 V     = df.FunctionSpace(mesh_, "CG", 1)
 
@@ -70,10 +70,10 @@ for (i_s,season) in enumerate(["July 2020", "January 2021"]):
         ])
 
     # domain outline
-    gdf = gpd.read_file(outline_path)
+    gdf = gpd.read_file(outline_file)
     gdf.plot(ax=ax, facecolor='none', edgecolor='black', linewidth=2, label='Domain')
     ax.annotate(season, xy=[0.5,1.15], xycoords="axes fraction", annotation_clip=False, fontsize=annotate_fs, fontweight="bold", ha="center", va="center")
     ax.annotate(f"{idx_to_letter(i_s)}", xy=(0.03,1.05), xycoords="axes fraction", fontsize=annotate_fs*0.9, fontweight="bold")
     remove_axes(ax)
 
-plt.savefig(fig_path / f"fS17.jpg")
+plt.savefig(fig_dir / f"fS17.jpg")

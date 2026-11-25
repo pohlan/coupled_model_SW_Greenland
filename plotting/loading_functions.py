@@ -1,6 +1,9 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import firedrake as df
 from firedrake.checkpointing import CheckpointFile
-import models_main.helpers as hlp
+import models_main as model
 import numpy as np
 import geoutils as gu
 import pandas as pd
@@ -42,13 +45,13 @@ def get_model_dates(n_idx, xstart, xend, start_year=2014):
     return np.array(dates_model)[i_model], i_model
 
 # load topography
-def load_topography(project_path, mesh_, sig=5):
-    r_bed = gu.Raster(str(project_path /  "Greenland_data" / f"BedMachineGreenland-v5_bed_smooth_sig{sig}.nc"))
-    r_thk = gu.Raster(str(project_path /  "Greenland_data" / f"BedMachineGreenland-v5_thickness_smooth_sig{sig}.nc")
+def load_topography(bedmachine_dir, mesh_, sig=5):
+    r_bed = gu.Raster(str(bedmachine_dir / f"BedMachineGreenland-v5_bed_smooth_sig{sig}.nc"))
+    r_thk = gu.Raster(str(bedmachine_dir / f"BedMachineGreenland-v5_thickness_smooth_sig{sig}.nc")
 )
     # interpolate onto mesh
     V = df.FunctionSpace(mesh_, "CG", 1)
-    meshx, meshy = zip(*hlp.get_coordinates(mesh_, "CG", 1))
+    meshx, meshy = zip(*model.get_coordinates(mesh_, "CG", 1))
     B = df.Function(V)
     H = df.Function(V)
     S = df.Function(V)
@@ -227,7 +230,7 @@ def get_s_functions(dists,  xc, yc, mesh_, smesh_, profile_width):
 
     # create function that holds the s function (how far along the profile, in a projected sense)
     V_DG0 = df.FunctionSpace(mesh_, "DG", 0)
-    meshx_DG0, meshy_DG0 = zip(*hlp.get_coordinates(mesh_, "DG", 0))
+    meshx_DG0, meshy_DG0 = zip(*model.get_coordinates(mesh_, "DG", 0))
     s = df.Function(V_DG0)
     for (i,(mx, my)) in enumerate(zip(meshx_DG0, meshy_DG0)):
         dist_to_flowl_pts = Point(mx,my).distance(pts_flowl)
@@ -237,7 +240,7 @@ def get_s_functions(dists,  xc, yc, mesh_, smesh_, profile_width):
 
     # same for submesh
     V_DGO_sub = df.FunctionSpace(smesh_, "DG", 0)
-    meshx_DG0_sub, meshy_DG0_sub = zip(*hlp.get_coordinates(smesh_, "DG", 0))
+    meshx_DG0_sub, meshy_DG0_sub = zip(*model.get_coordinates(smesh_, "DG", 0))
     s_sub = df.Function(V_DGO_sub)
     for (i,(mx, my)) in enumerate(zip(meshx_DG0_sub, meshy_DG0_sub)):
         dist_to_flowl_pts = Point(mx,my).distance(pts_flowl)
@@ -268,7 +271,7 @@ def load_obs_FunctionSpace(files, mesh_):
     sorted_dates, sorted_files = np.array(sorted_dates), np.array(sorted_files)
     # get function space
     V_DG0 = df.FunctionSpace(mesh_, "DG", 0)
-    meshx_DG0, meshy_DG0 = zip(*hlp.get_coordinates(mesh_, "DG", 0))
+    meshx_DG0, meshy_DG0 = zip(*model.get_coordinates(mesh_, "DG", 0))
     # read files in order
     n_months = len(sorted_files)
     U_obs = []
@@ -424,8 +427,8 @@ def prepare_location_inputs(xc, yc):
         return [[xc]], [[yc]]
     return xc, yc
 
-def get_model_timeseries_for_locations(project_path, mesh_, run_index, xstart, xend, xc, yc, start_year=2014):
-    timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+def get_model_timeseries_for_locations(project_dir, mesh_, run_index, xstart, xend, xc, yc, start_year=2014):
+    timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
     us_raw, _, _, _, _, _, _, n_idx, _ = load_model_output(timeseries_path)
 
     dates_model, i_model = get_model_dates(n_idx, xstart, xend, start_year=start_year)
@@ -443,8 +446,8 @@ def get_monthly_means_from_raw(mesh_, us_raw, n_idx, xstart, xend, xc, yc):
     monthly_means = df_monthly.resample("MS").mean()
     return monthly_means.to_numpy().ravel()
 
-def get_monthly_means_model(project_path, mesh_, run_index, xstart, xend, xc, yc, start_year=2014):
-    dates_model, U_model = get_model_timeseries_for_locations(project_path, mesh_, run_index, xstart, xend, xc, yc, start_year=start_year)
+def get_monthly_means_model(project_dir, mesh_, run_index, xstart, xend, xc, yc, start_year=2014):
+    dates_model, U_model = get_model_timeseries_for_locations(project_dir, mesh_, run_index, xstart, xend, xc, yc, start_year=start_year)
     dates_model_pd = pd.to_datetime(dates_model)
     df_monthly = pd.DataFrame(U_model, index=dates_model_pd)
     monthly_means = df_monthly.resample("MS").mean()

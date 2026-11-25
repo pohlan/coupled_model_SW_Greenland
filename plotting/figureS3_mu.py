@@ -15,10 +15,11 @@ from matplotlib.colors import LogNorm
 from matplotlib.ticker import ScalarFormatter
 
 # define data paths relative to this script's location
-script_dir = Path(__file__).resolve().parent
-project_path = script_dir.parent
-outline_path   = project_path /  "Greenland_data" / "russel" / "russel_domain.gpkg"
-fig_path       = project_path / "plotting" / "main_figures"
+script_dir     = Path(__file__).resolve().parent
+project_dir    = script_dir.parent
+outline_file   = project_dir / "domain" / "domain_outline.gpkg"
+bedmachine_dir = project_dir / "Greenland_data" / "bedmachine"
+fig_dir        = project_dir / "plotting" / "main_figures"
 
 # plotting parameters
 color_map = cmc.managua
@@ -34,13 +35,13 @@ ax2 = fig.add_subplot(gs_top[0,2])
 
 
 # baseline
-chk_file = str(project_path / "inversion_results" / "beta2_opt_1e-2.0_run313.h5")
+chk_file = str(project_dir / "inversion_results" / "beta2_opt_1e-2.0_run313.h5")
 with CheckpointFile(chk_file, 'r') as afile:
         mesh_ = afile.load_mesh()
         beta2 = afile.load_function(mesh_, name="beta2")
 
 # Uhat and Nhat
-B, H, S = load_topography(project_path, mesh_)
+B, H, S = load_topography(bedmachine_dir, mesh_)
 area = df.assemble(df.Constant(1)*df.dx(domain=mesh_))
 H_mean = df.assemble(H*df.dx)/area
 Uhat   = df.Constant(50)
@@ -56,12 +57,12 @@ formatter = ScalarFormatter(useMathText=True)
 formatter.set_powerlimits((0, 0))
 cbar.ax.yaxis.set_major_formatter(formatter)
 remove_axes(ax1)
-gdf = gpd.read_file(outline_path)
+gdf = gpd.read_file(outline_file)
 gdf.plot(ax=ax1, facecolor='none', edgecolor='black', linewidth=1, label='Domain')
 ax1.annotate("Baseline", xy=[0.5,1.1], xycoords="axes fraction", annotation_clip=False, fontsize=annotate_fs, fontweight="bold", ha="center", va="center")
 
 # baseline
-chk_file = str(project_path / "inversion_results" / "beta2_opt_1e-2.0_run543.h5")
+chk_file = str(project_dir / "inversion_results" / "beta2_opt_1e-2.0_run543.h5")
 with CheckpointFile(chk_file, 'r') as afile:
         mesh_ = afile.load_mesh()
         beta2 = afile.load_function(mesh_, name="beta2")
@@ -76,7 +77,6 @@ formatter = ScalarFormatter(useMathText=True)
 formatter.set_powerlimits((0, 0))
 cbar.ax.yaxis.set_major_formatter(formatter)
 remove_axes(ax2)
-gdf = gpd.read_file(outline_path)
 gdf.plot(ax=ax2, facecolor='none', edgecolor='black', linewidth=1, label='Domain')
 ax2.annotate("Reduced sheet flow", xy=[0.5,1.1], xycoords="axes fraction", annotation_clip=False, fontsize=annotate_fs, fontweight="bold", ha="center", va="center")
 
@@ -84,5 +84,5 @@ ax2.annotate("Reduced sheet flow", xy=[0.5,1.1], xycoords="axes fraction", annot
 panel_letter_annotation(ax1, 0, annotate_fs)
 panel_letter_annotation(ax2, 1, annotate_fs)
 
-plt.savefig(fig_path / "fS03.jpg")
+plt.savefig(fig_dir / "fS03.jpg")
 

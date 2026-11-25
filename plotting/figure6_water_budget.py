@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from plotting.loading_functions import *
 from plotting.plotting_functions import *
+from models_main.helpers import *
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.collections as mc
@@ -37,13 +38,15 @@ xstart_winter, xend_winter = datetime(year0,10,1), datetime(year0+1,4,30)
 xstart_summer, xend_summer = datetime(year0,5,1), datetime(year0,9,30)
 
 # define data paths relative to this script's location
-script_dir = Path(__file__).resolve().parent
-project_path = script_dir.parent
-outline_path = project_path /  "Greenland_data" / "russel" / "russel_domain.gpkg"
-hydro_file   = project_path / "Greenland_data" / "russel" / "hydrological_outlets_russel.gpkg"
-fig_path     = project_path / "plotting" / "main_figures"
+script_dir     = Path(__file__).resolve().parent
+project_dir    = script_dir.parent
+domain_dir     = project_dir / "domain"
+outline_file   = domain_dir / "domain_outline.gpkg"
+hydro_file     = domain_dir / "hydrological_outlets.gpkg"
+bedmachine_dir = project_dir / "Greenland_data" / "bedmachine"
+fig_dir        = project_dir / "plotting" / "main_figures"
 
-gdf = gpd.read_file(outline_path)
+gdf = gpd.read_file(outline_file)
 hydro_points = fiona.open(hydro_file, mode="r")
 hydro_coords = np.array([i['geometry']['coordinates'] for i in list(hydro_points.values())])
 
@@ -54,10 +57,10 @@ lw = 3
 markersz = 40
 
 # load model input independent of run
-timeseries_path = str(project_path / "parameter_runs" / f"run_{run_indices[0]}" / "time_series.h5")
+timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_indices[0]}" / "time_series.h5")
 mesh_, smesh_ = get_meshes(timeseries_path)
 coords = smesh_.coordinates.dat.data  # mesh coordinates
-B, H, S = load_topography(project_path, mesh_)
+B, H, S = load_topography(bedmachine_dir, mesh_)
 B_B = S([(xcoords[1],ycoords[1])])
 print(B_B)
 
@@ -211,7 +214,7 @@ for (i_r,(run_index,model_label,col)) in enumerate(zip(run_indices,model_labels,
     print(run_index)
 
     # load timeseries of fluxes total and through fluxgate (upper)
-    timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+    timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
     us_raw, m_raw, phi_raw, h_raw, q_raw, Q_raw, S_raw, n_idx, _ = load_model_output(timeseries_path)
     m_upper, q_upper, Q_upper, ms, q_out, Q_termini, dates_model, n_idx = inputs_outputs_timeseries(xstart, xend, m_raw, q_raw, h_raw, Q_raw, S_raw)
     qtot_out = np.sum(Q_termini,axis=1)+q_out
@@ -289,7 +292,7 @@ for (run_indices_suit, marker, col, alpha) in zip([run_indices_turbulent, run_in
 
         # load timeseries of fluxes total and through fluxgate (upper)
         try:
-            timeseries_path = str(project_path / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
+            timeseries_path = str(project_dir / "parameter_runs" / f"run_{run_index}" / "time_series.h5")
             us_raw, m_raw, phi_raw, h_raw, q_raw, Q_raw, S_raw, n_idx, _ = load_model_output(timeseries_path)
             m_upper, q_upper, Q_upper, ms, q_out, Q_termini, dates_model, n_idx = inputs_outputs_timeseries(xstart, xend, m_raw, q_raw, h_raw, Q_raw, S_raw)
             if len(dates_model)==0:
@@ -298,7 +301,7 @@ for (run_indices_suit, marker, col, alpha) in zip([run_indices_turbulent, run_in
             continue
 
         # parameters
-        float_params = hlp.get_params_from_input_file(project_path, run_index)
+        float_params = get_params_from_input_file(project_dir, run_index)
         m_basal.append(float_params["m_basal"])
         # get winter speedup in specific locations
         # point A
@@ -377,5 +380,5 @@ for (gs_,fig_) in zip([gs, gs_supp],[fig,fig_supp]):
     lax.legend(loc=(-0.2,0.7), frameon=False, title="Sheet flow")
     lax.axis("off")
 
-fig.savefig(fig_path / "f06.jpg")
-fig_supp.savefig(fig_path / "fS10.jpg")
+fig.savefig(fig_dir / "f06.jpg")
+fig_supp.savefig(fig_dir / "fS10.jpg")

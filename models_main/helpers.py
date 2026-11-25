@@ -54,8 +54,8 @@ def save_params_to_csv(args, params_output_file, success=True):
     else:
         df_params.to_csv(params_output_file, index=False)
 
-def get_params_from_input_file(project_path, run_index):
-    input_file = str(project_path / "parameter_runs" / f"run_{run_index}" / "parameters.txt")
+def get_params_from_input_file(project_dir, run_index):
+    input_file = str(project_dir / "parameter_runs" / f"run_{run_index}" / "parameters.txt")
     float_params = {}
     with open(input_file) as f:
         for line in f:
@@ -356,7 +356,7 @@ def make_subDG0(mesh):
     f_subDG0 = df.Function(subDG0)
     return f_subDG0, subm
 
-def save_DGT0(mesh, submesh, f_DGT, f_subDG0, pvd_file, time):
+def save_DGT0(mesh, submesh, f_DGT, f_subDG0):
     # get coordinates of dofs for both DGT0 and subDG0
     crds_DGT0 = get_coordinates(mesh, "DGT", 0)
     crds_subDG0 = get_coordinates(submesh, "DG", 0)  # doesn't need to be subm apparently

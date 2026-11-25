@@ -1,6 +1,6 @@
 import firedrake as df
 import numpy as np
-import models_main.helpers as hlp
+import models_main as model
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import matplotlib.dates as mdates
@@ -136,7 +136,7 @@ def panel_letter_annotation(ax, ii, annotate_fs, xyc=(0.03, 1.0)):
             )
 
 # Fig. 4 and Fig. SXX
-def plot_sensitivity_panel(project_path, ax_w, ax_s, mesh_, vel_dir, run_indices, var1, var2, xstart_winter, xend_winter, xstart_summer, xend_summer, xc, yc, colors, ii, run_indices_timeseries, param_units, param_labels,
+def plot_sensitivity_panel(project_dir, ax_w, ax_s, mesh_, vel_dir, run_indices, var1, var2, xstart_winter, xend_winter, xstart_summer, xend_summer, xc, yc, colors, ii, run_indices_timeseries, param_units, param_labels,
                            xscale="log", labelloc="best", legend=True, lw=3.5, marker_size_times=10, annotate_fs=23, ylims_s=None, ylims_w=None, scatter_annotate=False):
     dUs_winter = []
     dUs_summer = []
@@ -147,15 +147,15 @@ def plot_sensitivity_panel(project_path, ax_w, ax_s, mesh_, vel_dir, run_indices
     i_r = 0
     for run_idx in run_indices:
         try:
-            U_monthly_winter = get_monthly_means_model(project_path, mesh_, run_idx, xstart_winter, xend_winter, xc, yc, start_year=2014)
-            U_monthly_summer = get_monthly_means_model(project_path, mesh_, run_idx, xstart_summer, xend_summer, xc, yc, start_year=2014)
+            U_monthly_winter = get_monthly_means_model(project_dir, mesh_, run_idx, xstart_winter, xend_winter, xc, yc, start_year=2014)
+            U_monthly_summer = get_monthly_means_model(project_dir, mesh_, run_idx, xstart_summer, xend_summer, xc, yc, start_year=2014)
             if len(U_monthly_winter) == 0:
                 continue
             dU_winter = fit_linear_slope(U_monthly_winter)
             dU_summer = (np.max(U_monthly_summer) - np.mean(np.concatenate([U_monthly_summer,U_monthly_winter])))
             dUs_winter.append(dU_winter)
             dUs_summer.append(dU_summer)
-            float_params = hlp.get_params_from_input_file(project_path, run_idx)
+            float_params = model.get_params_from_input_file(project_dir, run_idx)
             param1.append(float_params[var1])
             param2.append(float_params[var2])
             print(f"run {run_idx}, {var1} = {float_params[var1]}")
@@ -236,17 +236,17 @@ def plot_sensitivity_panel(project_path, ax_w, ax_s, mesh_, vel_dir, run_indices
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
 
-def plot_timeseries_panel(project_path, ax, mesh_, vel_dir, run_indices, labels, xstart, xend, xstart_plot, xend_plot, xc, yc, ii, param_units, param_labels,
+def plot_timeseries_panel(project_dir, ax, mesh_, vel_dir, run_indices, labels, xstart, xend, xstart_plot, xend_plot, xc, yc, ii, param_units, param_labels,
                           lw_times=3.5, marker_size_times=8, annotate_fs=23, ylims=None, legend=True):
     files = glob.glob(str(vel_dir/"*vv*.tif"))
     obs_dates, obs_files = get_obs_files(files, xrange=(xstart_plot, xend_plot))
     cols = ["lightsteelblue", "darkblue", "cornflowerblue"]
     lws    = [lw_times,lw_times, lw_times*1.4]
     for (run_idx,c,lab,lw) in zip(run_indices,cols,labels,lws):
-        float_params = hlp.get_params_from_input_file(project_path, run_idx)
+        float_params = model.get_params_from_input_file(project_dir, run_idx)
         ks = float_params["k_s"]
         m  = float_params["m_basal"]
-        dates_model, U_model = get_model_timeseries_for_locations(project_path, mesh_, run_idx, xstart_plot, xend_plot, xc, yc, start_year=2014)
+        dates_model, U_model = get_model_timeseries_for_locations(project_dir, mesh_, run_idx, xstart_plot, xend_plot, xc, yc, start_year=2014)
         i_hydro_year = np.where(dates_model < xend)
         # if lab == "":
         #     ks_unit = r"$\mathrm{m^{\frac{7}{4}}\,kg^{-\frac{1}{2}}}$"

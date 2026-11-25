@@ -228,6 +228,7 @@ __marimo__/
 
 # ignore outputs
 parameter_runs/
+inversion_results/
 
 # figures
 *.jpg

@@ -10,9 +10,9 @@ gmsh.model.add("domain")
 geometry = gmsh.model.geo
 
 # define data paths relative to this script's location
-project_path = Path(__file__).resolve().parent
-domain_dir = project_path / "domain"
-hydro_file = domain_dir / "hydrological_outlets.gpkg"
+project_dir = Path(__file__).resolve().parent
+domain_dir  = project_dir / "domain"
+hydro_file  = domain_dir / "hydrological_outlets.gpkg"
 gdf = gpd.read_file(domain_dir / "domain_outline.gpkg")
 # gdf = gpd.read_file(domain_dir / "domain_smaller.gpkg")
 # gdf = gpd.read_file(domain_dir / "domain_Mankoff_k09_5glaciers.gpkg")
